@@ -1,0 +1,21 @@
+# 忽略日志目录
+logs/
+music_sync_pc/logs/
+
+# 忽略 Python 编译文件
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 忽略构建产物
+dist/
+build/
+*.spec
+
+# 忽略配置文件（如果包含敏感信息）
+config.json
+
+# 忽略 IDE 配置
+.vscode/
+.idea/
