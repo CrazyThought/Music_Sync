@@ -8,6 +8,7 @@ import '../services/signature_service.dart';
 import '../services/scanner_service.dart';
 import '../services/diff_service.dart';
 import '../services/import_service.dart';
+import '../services/permission_service.dart';
 import '../utils/constants.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -175,6 +176,25 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
       return;
+    }
+
+    final hasPermission = await PermissionService.instance.hasStoragePermission();
+    if (!hasPermission) {
+      final granted = await PermissionService.instance.requestStoragePermission();
+      if (!granted) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('需要存储权限才能扫描音乐'),
+              action: SnackBarAction(
+                label: '前往设置',
+                onPressed: () => PermissionService.instance.openAppSettings(),
+              ),
+            ),
+          );
+        }
+        return;
+      }
     }
 
     setState(() => _isScanning = true);
