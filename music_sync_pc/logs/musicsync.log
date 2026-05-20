@@ -1,0 +1,8 @@
+2026-05-20 08:09:27 [INFO] musicsync: MusicSync PC 端 v1.0.0 启动
+2026-05-20 08:09:27 [ERROR] musicsync: 程序异常退出
+Traceback (most recent call last):
+  File "D:\Programmes\Music_Sync\music_sync_pc\main.py", line 53, in main
+    from app import App
+  File "D:\Programmes\Music_Sync\music_sync_pc\app.py", line 8, in <module>
+    import customtkinter as ctk
+ModuleNotFoundError: No module named 'customtkinter'

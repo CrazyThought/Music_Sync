@@ -1,0 +1,47 @@
+{
+  "format_version": "2.0",
+  "generated_by": "MusicSync/PC/1.0.0",
+  "generated_at": 1779232785959,
+  "scan_root": "/workspace/tests/fixtures/small_music_lib",
+  "scan_summary": {
+    "total_files": 2,
+    "total_size_bytes": 26,
+    "scan_duration_ms": 16
+  },
+  "files": [
+    {
+      "relative_path": "pop/test_song.mp3",
+      "file_size": 13,
+      "modified_at": 1779232774256,
+      "content_hash": "8c6c22be5ab13e44",
+      "content_hash_algo": "xxh64",
+      "audio_meta": {
+        "title": "test_song",
+        "artist": "",
+        "album": null,
+        "duration_ms": 0,
+        "bitrate_kbps": null
+      },
+      "audio_fingerprint": null
+    },
+    {
+      "relative_path": "rock/test_rock.mp3",
+      "file_size": 13,
+      "modified_at": 1779232774256,
+      "content_hash": "22f5f03e3f02de82",
+      "content_hash_algo": "xxh64",
+      "audio_meta": {
+        "title": "test_rock",
+        "artist": "",
+        "album": null,
+        "duration_ms": 0,
+        "bitrate_kbps": null
+      },
+      "audio_fingerprint": null
+    }
+  ],
+  "fingerprint_algorithms": {
+    "content": "xxh64",
+    "audio": "none"
+  }
+}
