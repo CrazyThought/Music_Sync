@@ -16,7 +16,7 @@
       "ape",
       "wv"
     ],
-    "large_file_threshold_mb": 100,
+    "large_file_threshold_mb": 150,
     "chunk_hash_size_kb": 128
   },
   "appearance": {
