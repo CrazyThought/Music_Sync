@@ -1,7 +1,6 @@
 /// 设置页面 —— 音乐目录、导入目录、扫描参数配置。
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../services/config_service.dart';
 import '../utils/constants.dart';
@@ -250,16 +249,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _pickMusicFolder() async {
-    final status = await Permission.storage.request();
-    if (!status.isGranted) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('需要存储权限才能选择文件夹')),
-        );
-      }
-      return;
-    }
-
+    // Android 13+ 使用 MANAGE_EXTERNAL_STORAGE 或 READ_MEDIA_AUDIO，不需要检查旧的 Permission.storage
+    // file_picker 的 getDirectoryPath() 在有 MANAGE_EXTERNAL_STORAGE 权限时可直接使用
     final result = await FilePicker.platform.getDirectoryPath();
     if (result != null) {
       _musicController.text = result;
