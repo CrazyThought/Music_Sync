@@ -31,44 +31,40 @@ class _DiffScreenState extends State<DiffScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('差异详情')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildStatChip('新增', report?.added.length ?? 0, Colors.green),
-              _buildStatChip('更新', report?.updated.length ?? 0, Colors.blue),
-              _buildStatChip('删除', report?.removed.length ?? 0, Colors.red),
-              _buildStatChip('未变', report?.unchanged ?? 0, Colors.grey),
-            ],
-          ),
-          const SizedBox(height: 16),
-          DefaultTabController(
-            length: 3,
-            child: Column(
-              children: [
-                const TabBar(
-                  tabs: [
-                    Tab(text: '新增'),
-                    Tab(text: '更新'),
-                    Tab(text: '可删除'),
-                  ],
-                ),
-                SizedBox(
-                  height: 400,
-                  child: TabBarView(
-                    children: [
-                      _buildFileList(report?.added ?? [], Colors.green),
-                      _buildUpdatedList(report?.updated ?? []),
-                      _buildFileList(report?.removed ?? [], Colors.red),
-                    ],
-                  ),
-                ),
+      body: DefaultTabController(
+        length: 3,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildStatChip('新增', report?.added.length ?? 0, Colors.green),
+                  _buildStatChip('更新', report?.updated.length ?? 0, Colors.blue),
+                  _buildStatChip('删除', report?.removed.length ?? 0, Colors.red),
+                  _buildStatChip('未变', report?.unchanged ?? 0, Colors.grey),
+                ],
+              ),
+            ),
+            const TabBar(
+              tabs: [
+                Tab(text: '新增'),
+                Tab(text: '更新'),
+                Tab(text: '可删除'),
               ],
             ),
-          ),
-        ],
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _buildFileList(report?.added ?? [], Colors.green),
+                  _buildUpdatedList(report?.updated ?? []),
+                  _buildFileList(report?.removed ?? [], Colors.red),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
