@@ -14,7 +14,7 @@
       "file_size": 19,
       "modified_at": 1779233497332,
       "content_hash": "3f1ea753d25695de",
-      "content_hash_algo": "xxh64",
+      "content_hash_algo": "xxh3_64",
       "audio_meta": {
         "title": "test_classical_0",
         "artist": "",
@@ -29,7 +29,7 @@
       "file_size": 19,
       "modified_at": 1779233497332,
       "content_hash": "c3ded9e23aed360d",
-      "content_hash_algo": "xxh64",
+      "content_hash_algo": "xxh3_64",
       "audio_meta": {
         "title": "test_classical_1",
         "artist": "",
@@ -44,7 +44,7 @@
       "file_size": 20,
       "modified_at": 1779233497332,
       "content_hash": "560941a7ab146d53",
-      "content_hash_algo": "xxh64",
+      "content_hash_algo": "xxh3_64",
       "audio_meta": {
         "title": "test_electronic_0",
         "artist": "",
@@ -59,7 +59,7 @@
       "file_size": 20,
       "modified_at": 1779233497333,
       "content_hash": "ff1bf953d2f48046",
-      "content_hash_algo": "xxh64",
+      "content_hash_algo": "xxh3_64",
       "audio_meta": {
         "title": "test_electronic_1",
         "artist": "",
@@ -74,7 +74,7 @@
       "file_size": 14,
       "modified_at": 1779233497332,
       "content_hash": "a21825d478cc1de5",
-      "content_hash_algo": "xxh64",
+      "content_hash_algo": "xxh3_64",
       "audio_meta": {
         "title": "test_jazz_0",
         "artist": "",
@@ -89,7 +89,7 @@
       "file_size": 14,
       "modified_at": 1779233497332,
       "content_hash": "9e1a066e688bf2df",
-      "content_hash_algo": "xxh64",
+      "content_hash_algo": "xxh3_64",
       "audio_meta": {
         "title": "test_jazz_1",
         "artist": "",
@@ -104,7 +104,7 @@
       "file_size": 13,
       "modified_at": 1779233497331,
       "content_hash": "e196e54188eb4f64",
-      "content_hash_algo": "xxh64",
+      "content_hash_algo": "xxh3_64",
       "audio_meta": {
         "title": "test_pop_0",
         "artist": "",
@@ -119,7 +119,7 @@
       "file_size": 13,
       "modified_at": 1779233497332,
       "content_hash": "2a3e26799f30e63b",
-      "content_hash_algo": "xxh64",
+      "content_hash_algo": "xxh3_64",
       "audio_meta": {
         "title": "test_pop_1",
         "artist": "",
@@ -134,7 +134,7 @@
       "file_size": 13,
       "modified_at": 1779232774256,
       "content_hash": "8c6c22be5ab13e44",
-      "content_hash_algo": "xxh64",
+      "content_hash_algo": "xxh3_64",
       "audio_meta": {
         "title": "test_song",
         "artist": "",
@@ -149,7 +149,7 @@
       "file_size": 13,
       "modified_at": 1779232774256,
       "content_hash": "22f5f03e3f02de82",
-      "content_hash_algo": "xxh64",
+      "content_hash_algo": "xxh3_64",
       "audio_meta": {
         "title": "test_rock",
         "artist": "",
@@ -164,7 +164,7 @@
       "file_size": 14,
       "modified_at": 1779233497332,
       "content_hash": "8534226e16f5c9e0",
-      "content_hash_algo": "xxh64",
+      "content_hash_algo": "xxh3_64",
       "audio_meta": {
         "title": "test_rock_0",
         "artist": "",
@@ -179,7 +179,7 @@
       "file_size": 14,
       "modified_at": 1779233497332,
       "content_hash": "bcae95300a5e3c19",
-      "content_hash_algo": "xxh64",
+      "content_hash_algo": "xxh3_64",
       "audio_meta": {
         "title": "test_rock_1",
         "artist": "",
@@ -191,7 +191,7 @@
     }
   ],
   "fingerprint_algorithms": {
-    "content": "xxh64",
+    "content": "xxh3_64",
     "audio": "none"
   }
 }

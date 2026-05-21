@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models/sync_report.dart';
 import '../models/file_entry.dart';
+import '../models/updated_file_pair.dart';
 import '../utils/constants.dart';
 
 class DiffScreen extends StatefulWidget {
@@ -59,7 +60,7 @@ class _DiffScreenState extends State<DiffScreen> {
                   child: TabBarView(
                     children: [
                       _buildFileList(report?.added ?? [], Colors.green),
-                      _buildFileList(report?.updated ?? [], Colors.blue),
+                      _buildUpdatedList(report?.updated ?? []),
                       _buildFileList(report?.removed ?? [], Colors.red),
                     ],
                   ),
@@ -100,5 +101,49 @@ class _DiffScreenState extends State<DiffScreen> {
         );
       },
     );
+  }
+
+  Widget _buildUpdatedList(List<UpdatedFilePair> items) {
+    if (items.isEmpty) {
+      return const Center(child: Text('没有需要更新的文件'));
+    }
+    return ListView.builder(
+      itemCount: items.length,
+      itemBuilder: (context, index) {
+        final pair = items[index];
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: ListTile(
+            title: Text(pair.relativePath, style: const TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '手机端: ${_formatSize(pair.phoneFile.fileSize)} | ${_formatDate(pair.phoneFile.modifiedAt)}',
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                ),
+                Text(
+                  'PC 端: ${_formatSize(pair.pcFile.fileSize)} | ${_formatDate(pair.pcFile.modifiedAt)}',
+                  style: const TextStyle(color: Color(0xFF1976D2), fontSize: 12),
+                ),
+              ],
+            ),
+            leading: const Icon(Icons.update, color: Color(0xFF1976D2)),
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  String _formatDate(int msSinceEpoch) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(msSinceEpoch);
+    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
+        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
   }
 }

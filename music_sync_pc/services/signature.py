@@ -37,7 +37,7 @@ def validate_signature(data: dict[str, Any]) -> None:
         raise ValueError(f"不支持的特征文件版本: {fmt}")
 
     algo = data.get("fingerprint_algorithms", {}).get("content", "")
-    if algo != "xxh64":
+    if algo not in ("xxh64", "xxh3_64"):
         raise ValueError(f"不支持的哈希算法: {algo}")
 
     if "files" not in data or not isinstance(data["files"], list):

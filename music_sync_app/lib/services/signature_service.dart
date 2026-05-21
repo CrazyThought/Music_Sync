@@ -37,7 +37,7 @@ class SignatureService {
       throw FormatException('不支持的特征文件版本: ${signature.formatVersion}');
     }
     final algo = signature.fingerprintAlgorithms['content'];
-    if (algo != null && algo != 'xxh64') {
+    if (algo != null && algo != 'xxh64' && algo != 'xxh3_64') {
       throw FormatException('不支持的哈希算法: $algo');
     }
     return signature;

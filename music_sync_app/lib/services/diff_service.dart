@@ -2,6 +2,7 @@
 import '../models/file_entry.dart';
 import '../models/signature.dart';
 import '../models/sync_report.dart';
+import '../models/updated_file_pair.dart';
 
 class DiffService {
   SyncReport compare(Signature pcSignature, Signature phoneSignature) {
@@ -16,15 +17,15 @@ class DiffService {
     }
 
     final added = <FileEntry>[];
-    final updated = <FileEntry>[];
+    final updated = <UpdatedFilePair>[];
     int unchanged = 0;
 
     for (final pcFile in pcSignature.files) {
       final phoneFile = phoneByPath[pcFile.relativePath];
       if (phoneFile == null) {
         added.add(pcFile);
-      } else if (phoneFile.contentHash != pcFile.contentHash) {
-        updated.add(pcFile);
+      } else if (phoneFile.fileSize != pcFile.fileSize) {
+        updated.add(UpdatedFilePair(pcFile: pcFile, phoneFile: phoneFile));
       } else {
         unchanged++;
       }

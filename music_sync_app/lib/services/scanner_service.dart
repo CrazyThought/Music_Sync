@@ -1,12 +1,16 @@
 /// 手机端文件扫描服务。
 import 'dart:io';
-import 'dart:math';
+
+import 'package:flutter/foundation.dart';
 
 import '../models/file_entry.dart';
 import '../models/signature.dart';
 import '../utils/constants.dart';
+import 'hash_utils.dart';
 
 class ScannerService {
+  static const _largeFileThreshold = 100 * 1024 * 1024; // 100 MB
+
   Future<Signature> scanDirectory(String rootPath) async {
     final stopwatch = Stopwatch()..start();
 
@@ -16,12 +20,26 @@ class ScannerService {
     }
 
     final entries = <FileEntry>[];
+    debugPrint('扫描开始: $rootPath');
+    try {
+      final allFiles = await dir.list(recursive: true).toList();
+      debugPrint('目录总条目数（含目录和文件）: ${allFiles.length}');
+      for (final entity in allFiles) {
+        debugPrint('  ${entity is File ? "文件" : "目录"}: ${entity.path}');
+      }
+    } catch (e) {
+      debugPrint('⚠ 无法列出目录内容: $e');
+    }
     await _scanDir(dir, dir, entries);
 
     entries.sort((a, b) => a.relativePath.compareTo(b.relativePath));
 
     final totalSize = entries.fold<int>(0, (sum, e) => sum + e.fileSize);
     final durationMs = stopwatch.elapsedMilliseconds;
+    debugPrint('扫描完成，发现音频文件数: ${entries.length}');
+    for (final entry in entries) {
+      debugPrint('  音频: ${entry.relativePath} (${entry.fileSize} bytes, hash=${entry.contentHash})');
+    }
 
     return Signature(
       formatVersion: '2.0',
@@ -34,11 +52,12 @@ class ScannerService {
         scanDurationMs: durationMs,
       ),
       files: entries,
-      fingerprintAlgorithms: const {'content': 'xxh64', 'audio': 'none'},
+      fingerprintAlgorithms: const {'content': 'xxh3_64', 'audio': 'none'},
     );
   }
 
   Future<void> _scanDir(Directory root, Directory dir, List<FileEntry> result) async {
+    final countBefore = result.length;
     await for (final entity in dir.list(recursive: false)) {
       if (entity is File) {
         final ext = entity.path.split('.').lastOrNull?.toLowerCase() ?? '';
@@ -53,7 +72,7 @@ class ScannerService {
           relativePath: relativePath,
           fileSize: stat.size,
           modifiedAt: stat.modified.millisecondsSinceEpoch,
-          contentHash: '', // 手机端暂不计算xxHash，留待后续
+          contentHash: await _computeHash(entity.path, stat.size),
           audioMeta: const AudioMeta(
             title: '',
             artist: '',
@@ -63,6 +82,22 @@ class ScannerService {
       } else if (entity is Directory) {
         await _scanDir(root, entity, result);
       }
+    }
+    debugPrint('_scanDir 完成: ${dir.path}, 音频文件: ${result.length - countBefore}');
+  }
+
+  Future<String> _computeHash(String filePath, int fileSize) async {
+    try {
+      final hash = fileSize >= _largeFileThreshold
+          ? await computeChunkedHash(filePath, fileSize)
+          : await computeXxh64(filePath);
+      if (hash.isEmpty) {
+        debugPrint('哈希计算返回空: $filePath ($fileSize bytes)');
+      }
+      return hash;
+    } catch (e) {
+      debugPrint('哈希计算失败: $filePath ($fileSize bytes), $e');
+      return '';
     }
   }
 }

@@ -14,7 +14,7 @@
       "file_size": 13,
       "modified_at": 1779232774256,
       "content_hash": "8c6c22be5ab13e44",
-      "content_hash_algo": "xxh64",
+      "content_hash_algo": "xxh3_64",
       "audio_meta": {
         "title": "test_song",
         "artist": "",
@@ -29,7 +29,7 @@
       "file_size": 13,
       "modified_at": 1779232774256,
       "content_hash": "22f5f03e3f02de82",
-      "content_hash_algo": "xxh64",
+      "content_hash_algo": "xxh3_64",
       "audio_meta": {
         "title": "test_rock",
         "artist": "",
@@ -41,7 +41,7 @@
     }
   ],
   "fingerprint_algorithms": {
-    "content": "xxh64",
+    "content": "xxh3_64",
     "audio": "none"
   }
 }

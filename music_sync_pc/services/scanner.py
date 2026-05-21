@@ -160,7 +160,7 @@ class MusicScanner:
         return {
             **file_info,
             "content_hash": content_hash,
-            "content_hash_algo": "xxh64",
+            "content_hash_algo": "xxh3_64",
             "audio_meta": meta,
             "audio_fingerprint": None,
         }
@@ -183,7 +183,7 @@ class MusicScanner:
             },
             "files": files,
             "fingerprint_algorithms": {
-                "content": "xxh64",
+                "content": "xxh3_64",
                 "audio": "none",
             },
         }

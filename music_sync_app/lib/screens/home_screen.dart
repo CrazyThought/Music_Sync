@@ -1,13 +1,16 @@
 /// 主页 —— 状态概览卡片。
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/signature.dart';
 import '../models/sync_report.dart';
 import '../services/config_service.dart';
-import '../services/signature_service.dart';
 import '../services/scanner_service.dart';
 import '../services/diff_service.dart';
-import '../services/import_service.dart';
 import '../services/permission_service.dart';
 import '../utils/constants.dart';
 
@@ -23,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Signature? _pcSignature;
   SyncReport? _report;
   bool _isScanning = false;
+  bool _isExporting = false;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +52,10 @@ class _HomeScreenState extends State<HomeScreen> {
             signature: _phoneSignature,
             onScan: _scanPhone,
             isScanning: _isScanning,
+            isExporting: _isExporting,
+            onExport: (_phoneSignature != null && _phoneSignature!.scanSummary.totalFiles > 0)
+                ? _exportPhoneSignature
+                : null,
           ),
           const SizedBox(height: 12),
           _buildDeviceCard(
@@ -71,7 +79,9 @@ class _HomeScreenState extends State<HomeScreen> {
     Signature? signature,
     VoidCallback? onScan,
     VoidCallback? onImport,
+    VoidCallback? onExport,
     bool isScanning = false,
+    bool isExporting = false,
   }) {
     return Card(
       child: Padding(
@@ -109,6 +119,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 onPressed: onImport,
                 icon: const Icon(Icons.file_open),
                 label: const Text('导入 PC 特征文件'),
+              ),
+            if (onExport != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: OutlinedButton.icon(
+                  onPressed: isExporting ? null : onExport,
+                  icon: Icon(isExporting ? Icons.hourglass_top : Icons.file_download),
+                  label: Text(isExporting ? '导出中...' : '导出特征文件'),
+                ),
               ),
           ],
         ),
@@ -230,6 +249,41 @@ class _HomeScreenState extends State<HomeScreen> {
       final diffService = DiffService();
       _report = diffService.compare(_pcSignature!, _phoneSignature!);
       setState(() {});
+    }
+  }
+
+  Future<void> _exportPhoneSignature() async {
+    final sig = _phoneSignature;
+    if (sig == null) return;
+
+    setState(() => _isExporting = true);
+    try {
+      final jsonStr = const JsonEncoder.withIndent('  ').convert(sig.toJson());
+      final jsonBytes = utf8.encode(jsonStr);
+
+      final outputPath = await FilePicker.platform.saveFile(
+        dialogTitle: '保存特征文件',
+        fileName: 'phone_signature.json',
+        bytes: jsonBytes,
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+      );
+
+      if (outputPath != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('特征文件已导出到: $outputPath')),
+        );
+      }
+      if (mounted) {
+        setState(() => _isExporting = false);
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isExporting = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('导出失败: $e')),
+        );
+      }
     }
   }
 }

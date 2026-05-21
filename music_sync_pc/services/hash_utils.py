@@ -1,4 +1,4 @@
-"""文件哈希工具 —— xxHash-64，大文件分块策略。"""
+"""文件哈希工具 —— XXH3-64，大文件分块策略。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def compute_xxhash64(file_path: Path) -> str:
-    h = xxhash.xxh64()
+    h = xxhash.xxh3_64()
     with open(file_path, "rb") as f:
         while True:
             chunk = f.read(8192)
@@ -26,7 +26,7 @@ def compute_chunked_hash(
     if file_size <= chunk_size * 2:
         return compute_xxhash64(file_path)
 
-    h = xxhash.xxh64()
+    h = xxhash.xxh3_64()
     with open(file_path, "rb") as f:
         h.update(f.read(chunk_size))
         f.seek(max(0, file_size - chunk_size))

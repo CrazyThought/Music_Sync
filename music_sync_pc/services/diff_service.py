@@ -36,7 +36,7 @@ def compare_signatures(
     for path, entry in pc_map.items():
         if path not in local_map:
             report.added.append(entry)
-        elif entry.get("content_hash") != local_map[path].get("content_hash"):
+        elif entry.get("file_size") != local_map[path].get("file_size"):
             report.updated.append(entry)
         else:
             report.unchanged += 1
