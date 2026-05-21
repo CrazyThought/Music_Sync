@@ -83,22 +83,29 @@ class ScanPage(ctk.CTkFrame):
 
         self._scan_btn = ctk.CTkButton(action_frame, text="开始扫描",
                                        height=36, command=self._start_scan)
-        self._scan_btn.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        self._scan_btn.grid(row=0, column=0, padx=10, pady=(10, 2), sticky="ew")
 
-        self._progress = ctk.CTkProgressBar(action_frame)
+        self._progress = ctk.CTkProgressBar(action_frame, progress_color="#00BCD4", height=8)
         self._progress.set(0)
+        self._progress.grid_forget()
+
         self._status_label = ctk.CTkLabel(action_frame, text="",
                                           font=ctk.CTkFont(size=12))
-        self._status_label.grid(row=1, column=0, padx=10, pady=(0, 10))
+        self._status_label.grid(row=1, column=0, padx=10, pady=(2, 10))
 
         export_frame = ctk.CTkFrame(self)
         export_frame.grid(row=3, column=0, padx=15, pady=5, sticky="ew")
         export_frame.grid_columnconfigure(0, weight=1)
+        export_frame.grid_columnconfigure(1, weight=1)
 
         self._export_btn = ctk.CTkButton(export_frame, text="导出签名文件",
                                          height=36, command=self._export_signature,
                                          state="disabled")
-        self._export_btn.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
+        self._export_btn.grid(row=0, column=0, padx=(10, 5), pady=10, sticky="ew")
+
+        self._import_btn = ctk.CTkButton(export_frame, text="导入特征文件",
+                                         height=36, command=self._import_signature)
+        self._import_btn.grid(row=0, column=1, padx=(5, 10), pady=10, sticky="ew")
 
     def _choose_music_folder(self) -> None:
         folder = filedialog.askdirectory(title="选择音乐文件夹")
@@ -115,6 +122,7 @@ class ScanPage(ctk.CTkFrame):
             self.config.output_folder = folder
 
     def _refresh_state(self) -> None:
+        """刷新路径输入框和统计标签，不覆盖内存中的扫描数据。"""
         music_folder = self.config.music_folder
         if music_folder:
             self._music_entry.delete(0, "end")
@@ -135,15 +143,6 @@ class ScanPage(ctk.CTkFrame):
             self._size_label.configure(text=f"总大小\n{format_size(total_size)}")
             self._last_scan_label.configure(text=f"上次扫描\n{time_str}")
 
-        output_dir = Path(self.config.output_folder)
-        sig_path = output_dir / "pc_signature.json"
-        if sig_path.exists():
-            try:
-                self.scan_result = load_signature(sig_path)
-                self._export_btn.configure(state="normal")
-            except (OSError, ValueError, FileNotFoundError):
-                self.scan_result = None
-
     def _start_scan(self) -> None:
         music_folder = self._music_entry.get().strip()
         if not music_folder:
@@ -158,13 +157,17 @@ class ScanPage(ctk.CTkFrame):
         self._scanning = True
         self._scan_btn.configure(state="disabled", text="扫描中...")
         self._status_label.configure(text="正在扫描...")
-        self._progress.grid(row=0, column=0, padx=10, pady=(10, 2), sticky="ew")
+        self._progress.grid(row=1, column=0, padx=10, pady=(2, 2), sticky="ew")
         self._progress.set(0)
         self._progress.start()
 
-        threading.Thread(target=self._run_scan, args=(music_folder,), daemon=True).start()
+        # 新扫描前清除历史数据和差异报告
+        self.scan_result = None
+        self.diff_report = None
 
-    def _run_scan(self, music_folder: str) -> None:
+        threading.Thread(target=self._run_scan, args=(music_folder, True), daemon=True).start()
+
+    def _run_scan(self, music_folder: str, clear_previous: bool = False) -> None:
         try:
             scanner = MusicScanner(
                 root_path=Path(music_folder),
@@ -173,7 +176,7 @@ class ScanPage(ctk.CTkFrame):
             previous = None
             output_dir = Path(self.config.output_folder)
             sig_path = output_dir / "pc_signature.json"
-            if sig_path.exists():
+            if not clear_previous and sig_path.exists():
                 try:
                     previous = load_signature(sig_path)
                 except (OSError, ValueError, FileNotFoundError):
@@ -219,7 +222,26 @@ class ScanPage(ctk.CTkFrame):
         else:
             self._status_label.configure(text="扫描完成，未生成结果")
 
-        self._refresh_state()
+        # 只刷新 UI 显示，不重新加载 scan_result（避免覆盖新扫描数据）
+        music_folder = self.config.music_folder
+        if music_folder:
+            self._music_entry.delete(0, "end")
+            self._music_entry.insert(0, music_folder)
+        output_folder = self.config.output_folder
+        if output_folder:
+            self._output_entry.delete(0, "end")
+            self._output_entry.insert(0, output_folder)
+
+        last = self.config.last_scan
+        if last:
+            total = last.get("total_files", 0)
+            total_size = last.get("total_size_bytes", 0)
+            ts = last.get("timestamp", 0)
+            from datetime import datetime
+            time_str = datetime.fromtimestamp(ts / 1000).strftime("%m-%d %H:%M") if ts else "-"
+            self._total_label.configure(text=f"总文件数\n{total}")
+            self._size_label.configure(text=f"总大小\n{format_size(total_size)}")
+            self._last_scan_label.configure(text=f"上次扫描\n{time_str}")
 
     def _on_scan_error(self, error: str) -> None:
         self._scanning = False
@@ -239,6 +261,40 @@ class ScanPage(ctk.CTkFrame):
             self._status_label.configure(text=f"签名文件已导出: {sig_path}")
         except (OSError, ValueError) as e:
             self._status_label.configure(text=f"导出失败: {e}")
+
+    def _import_signature(self) -> None:
+        file_path = filedialog.askopenfilename(
+            title="导入特征文件",
+            filetypes=[("JSON 文件", "*.json"), ("所有文件", "*.*")],
+        )
+        if not file_path:
+            return
+
+        try:
+            imported = load_signature(Path(file_path))
+            output_dir = Path(self.config.output_folder)
+            output_dir.mkdir(parents=True, exist_ok=True)
+            total_files = imported.get("scan_summary", {}).get("total_files", len(imported.get("files", [])))
+
+            # 如果已有当前扫描结果，立即执行差异比较
+            if self.scan_result:
+                try:
+                    self.diff_report = compare_signatures(self.scan_result, imported)
+                    if self.diff_report:
+                        logger.info("导入后差异比较：新增=%d, 更新=%d, 删除=%d, 未变=%d",
+                                   len(self.diff_report.added), len(self.diff_report.updated),
+                                   len(self.diff_report.removed), self.diff_report.unchanged)
+                except (KeyError, TypeError, ValueError) as e:
+                    logger.warning("导入后差异比较失败: %s", e)
+                    self.diff_report = None
+            else:
+                # 没有扫描结果时，导入作为当前结果
+                self.scan_result = imported
+
+            self._status_label.configure(text=f"导入成功：{total_files} 首歌曲")
+            self._export_btn.configure(state="normal")
+        except (OSError, ValueError, FileNotFoundError) as e:
+            self._status_label.configure(text=f"导入失败: {e}")
 
     def on_tab_activated(self) -> None:
         self._refresh_state()

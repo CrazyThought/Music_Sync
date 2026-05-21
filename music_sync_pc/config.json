@@ -16,7 +16,7 @@
       "ape",
       "wv"
     ],
-    "large_file_threshold_mb": 150,
+    "large_file_threshold_mb": 200,
     "chunk_hash_size_kb": 128
   },
   "appearance": {
@@ -24,9 +24,9 @@
     "language": "zh"
   },
   "last_scan": {
-    "timestamp": 1779316734353,
-    "total_files": 2101,
-    "total_size_bytes": 22008102047,
+    "timestamp": 1779400488121,
+    "total_files": 2137,
+    "total_size_bytes": 22606570416,
     "signature_file": "C:\\Users\\e2816\\Desktop\\pc_signature.json"
   }
 }
