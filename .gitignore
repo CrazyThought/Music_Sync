@@ -25,6 +25,9 @@ dist/
 build/
 *.spec
 music_sync_pc/dist/
+*.apk
+*.exe
+*.log
 
 # 忽略配置文件（如果包含敏感信息）
 music_sync_pc/config.json
