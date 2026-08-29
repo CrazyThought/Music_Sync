@@ -11,7 +11,7 @@ import 'hash_utils.dart';
 class ScannerService {
   static const _largeFileThreshold = 100 * 1024 * 1024; // 100 MB
 
-  Future<Signature> scanDirectory(String rootPath) async {
+  Future<Signature> scanDirectory(String rootPath, {bool computeHash = true}) async {
     final stopwatch = Stopwatch()..start();
 
     final dir = Directory(rootPath);
@@ -30,7 +30,7 @@ class ScannerService {
     } catch (e) {
       debugPrint('⚠ 无法列出目录内容: $e');
     }
-    await _scanDir(dir, dir, entries);
+    await _scanDir(dir, dir, entries, computeHash);
 
     entries.sort((a, b) => a.relativePath.compareTo(b.relativePath));
 
@@ -52,11 +52,19 @@ class ScannerService {
         scanDurationMs: durationMs,
       ),
       files: entries,
-      fingerprintAlgorithms: const {'content': 'xxh3_64', 'audio': 'none'},
+      fingerprintAlgorithms: {
+        'content': computeHash ? 'xxh3_64' : 'none',
+        'audio': 'none',
+      },
     );
   }
 
-  Future<void> _scanDir(Directory root, Directory dir, List<FileEntry> result) async {
+  Future<void> _scanDir(
+    Directory root,
+    Directory dir,
+    List<FileEntry> result,
+    bool computeHash,
+  ) async {
     final countBefore = result.length;
     await for (final entity in dir.list(recursive: false)) {
       if (entity is File) {
@@ -72,7 +80,10 @@ class ScannerService {
           relativePath: relativePath,
           fileSize: stat.size,
           modifiedAt: stat.modified.millisecondsSinceEpoch,
-          contentHash: await _computeHash(entity.path, stat.size),
+          contentHash: computeHash
+              ? await _computeHash(entity.path, stat.size)
+              : '',
+          contentHashAlgo: computeHash ? 'xxh3_64' : 'none',
           audioMeta: const AudioMeta(
             title: '',
             artist: '',
@@ -80,7 +91,7 @@ class ScannerService {
           ),
         ));
       } else if (entity is Directory) {
-        await _scanDir(root, entity, result);
+        await _scanDir(root, entity, result, computeHash);
       }
     }
     debugPrint('_scanDir 完成: ${dir.path}, 音频文件: ${result.length - countBefore}');
