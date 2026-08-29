@@ -51,4 +51,14 @@ class ConfigService extends ChangeNotifier {
     _config.themeMode = mode;
     save();
   }
+
+  void updateHashComputation(bool enabled) {
+    _config.enableHashComputation = enabled;
+    save();
+  }
+
+  void updateDebugLog(bool enabled) {
+    _config.enableDebugLog = enabled;
+    save();
+  }
 }

@@ -219,7 +219,10 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isScanning = true);
     try {
       final scanner = ScannerService();
-      final sig = await scanner.scanDirectory(config.musicFolderPath);
+      final sig = await scanner.scanDirectory(
+        config.musicFolderPath,
+        computeHash: config.enableHashComputation,
+      );
       setState(() {
         _phoneSignature = sig;
         _isScanning = false;

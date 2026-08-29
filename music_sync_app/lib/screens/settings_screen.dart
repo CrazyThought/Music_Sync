@@ -158,6 +158,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             const SizedBox(height: 12),
+            SwitchListTile(
+              title: const Text('音乐哈希运算'),
+              subtitle: const Text('关闭时跳过哈希计算，避免权限受限导致扫描异常'),
+              value: config.enableHashComputation,
+              onChanged: (v) {
+                ConfigService.instance.updateHashComputation(v);
+                setState(() {});
+              },
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+            ),
+            const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 4,

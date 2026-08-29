@@ -7,6 +7,8 @@ class AppConfig {
   List<String> ignoredDirs;
   String themeMode;
   int lastScanTimestamp;
+  bool enableHashComputation;
+  bool enableDebugLog;
 
   AppConfig({
     this.musicFolderPath = '',
@@ -16,6 +18,8 @@ class AppConfig {
     this.ignoredDirs = const [],
     this.themeMode = 'dark',
     this.lastScanTimestamp = 0,
+    this.enableHashComputation = false,
+    this.enableDebugLog = false,
   });
 
   factory AppConfig.fromJson(Map<String, dynamic> json) {
@@ -27,6 +31,8 @@ class AppConfig {
       ignoredDirs: List<String>.from(json['ignoredDirs'] ?? []),
       themeMode: json['themeMode'] as String? ?? 'dark',
       lastScanTimestamp: json['lastScanTimestamp'] as int? ?? 0,
+      enableHashComputation: json['enableHashComputation'] as bool? ?? false,
+      enableDebugLog: json['enableDebugLog'] as bool? ?? false,
     );
   }
 
@@ -38,5 +44,7 @@ class AppConfig {
         'ignoredDirs': ignoredDirs,
         'themeMode': themeMode,
         'lastScanTimestamp': lastScanTimestamp,
+        'enableHashComputation': enableHashComputation,
+        'enableDebugLog': enableDebugLog,
       };
 }
