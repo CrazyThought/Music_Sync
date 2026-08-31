@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
 import '../models/signature.dart';
+import '../services/debug_log_service.dart';
 import '../services/import_service.dart';
 
 class ImportScreen extends StatefulWidget {
@@ -106,11 +107,14 @@ class _ImportScreenState extends State<ImportScreen> {
 
     if (mounted) {
       if (importResult.success) {
+        DebugLogService.instance
+            .status('导入 PC 特征成功: ${importResult.signature!.scanSummary.totalFiles} 首');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('导入成功: ${importResult.signature!.scanSummary.totalFiles} 首')),
         );
         Navigator.pop(context, importResult.signature);
       } else {
+        DebugLogService.instance.error('导入 PC 特征失败: ${importResult.error}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('导入失败: ${importResult.error}')),
         );
@@ -133,11 +137,14 @@ class _ImportScreenState extends State<ImportScreen> {
 
     if (mounted) {
       if (importResult.success) {
+        DebugLogService.instance
+            .status('导入 PC 特征成功: ${importResult.signature!.scanSummary.totalFiles} 首');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('导入成功: ${importResult.signature!.scanSummary.totalFiles} 首')),
         );
         Navigator.pop(context, importResult.signature);
       } else {
+        DebugLogService.instance.error('导入 PC 特征失败: ${importResult.error}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('导入失败: ${importResult.error}')),
         );

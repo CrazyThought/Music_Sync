@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../models/file_entry.dart';
 import '../models/signature.dart';
 import '../utils/constants.dart';
+import 'debug_log_service.dart';
 import 'hash_utils.dart';
 
 class ScannerService {
@@ -21,14 +22,18 @@ class ScannerService {
 
     final entries = <FileEntry>[];
     debugPrint('扫描开始: $rootPath');
+    DebugLogService.instance.operation('扫描开始: $rootPath');
     try {
       final allFiles = await dir.list(recursive: true).toList();
       debugPrint('目录总条目数（含目录和文件）: ${allFiles.length}');
+      DebugLogService.instance.info('目录总条目数（含目录和文件）: ${allFiles.length}');
       for (final entity in allFiles) {
         debugPrint('  ${entity is File ? "文件" : "目录"}: ${entity.path}');
+        DebugLogService.instance.info('  ${entity is File ? "文件" : "目录"}: ${entity.path}');
       }
     } catch (e) {
       debugPrint('⚠ 无法列出目录内容: $e');
+      DebugLogService.instance.error('无法列出目录内容: $e');
     }
     await _scanDir(dir, dir, entries, computeHash);
 
@@ -37,8 +42,10 @@ class ScannerService {
     final totalSize = entries.fold<int>(0, (sum, e) => sum + e.fileSize);
     final durationMs = stopwatch.elapsedMilliseconds;
     debugPrint('扫描完成，发现音频文件数: ${entries.length}');
+    DebugLogService.instance.status('扫描完成，发现音频文件数: ${entries.length}');
     for (final entry in entries) {
       debugPrint('  音频: ${entry.relativePath} (${entry.fileSize} bytes, hash=${entry.contentHash})');
+      DebugLogService.instance.info('  音频: ${entry.relativePath} (${entry.fileSize} bytes, hash=${entry.contentHash})');
     }
 
     return Signature(
@@ -95,6 +102,7 @@ class ScannerService {
       }
     }
     debugPrint('_scanDir 完成: ${dir.path}, 音频文件: ${result.length - countBefore}');
+    DebugLogService.instance.info('_scanDir 完成: ${dir.path}, 音频文件: ${result.length - countBefore}');
   }
 
   Future<String> _computeHash(String filePath, int fileSize) async {
@@ -104,10 +112,12 @@ class ScannerService {
           : await computeXxh64(filePath);
       if (hash.isEmpty) {
         debugPrint('哈希计算返回空: $filePath ($fileSize bytes)');
+        DebugLogService.instance.info('哈希计算返回空: $filePath ($fileSize bytes)');
       }
       return hash;
     } catch (e) {
       debugPrint('哈希计算失败: $filePath ($fileSize bytes), $e');
+      DebugLogService.instance.error('哈希计算失败: $filePath ($fileSize bytes), $e');
       return '';
     }
   }

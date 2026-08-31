@@ -9,10 +9,12 @@ import 'package:path_provider/path_provider.dart';
 import '../models/signature.dart';
 import '../models/sync_report.dart';
 import '../services/config_service.dart';
+import '../services/debug_log_service.dart';
 import '../services/scanner_service.dart';
 import '../services/diff_service.dart';
 import '../services/permission_service.dart';
 import '../utils/constants.dart';
+import '../widgets/debug_log_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -36,9 +38,16 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('MusicSync'),
         actions: [
+          if (config.enableDebugLog)
+            IconButton(
+              icon: const Icon(Icons.receipt_long),
+              tooltip: '调试日志',
+              onPressed: () => showDebugLogDialog(context),
+            ),
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () => Navigator.pushNamed(context, '/settings'),
+            onPressed: () =>
+                Navigator.pushNamed(context, '/settings').then((_) => setState(() {})),
           ),
         ],
       ),
@@ -216,6 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
+    DebugLogService.instance.operation('开始扫描本机音乐: ${config.musicFolderPath}');
     setState(() => _isScanning = true);
     try {
       final scanner = ScannerService();
@@ -223,12 +233,14 @@ class _HomeScreenState extends State<HomeScreen> {
         config.musicFolderPath,
         computeHash: config.enableHashComputation,
       );
+      DebugLogService.instance.status('扫描完成: 共 ${sig.scanSummary.totalFiles} 首');
       setState(() {
         _phoneSignature = sig;
         _isScanning = false;
       });
       _computeDiff();
     } catch (e) {
+      DebugLogService.instance.error('扫描失败: $e');
       setState(() => _isScanning = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -242,6 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final result = await Navigator.pushNamed(context, '/import');
     if (result != null && result is Signature) {
       _pcSignature = result as Signature;
+      DebugLogService.instance.operation('导入 PC 特征文件完成，开始差异比较');
       _computeDiff();
     }
     if (mounted) setState(() {});
@@ -251,6 +264,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_phoneSignature != null && _pcSignature != null) {
       final diffService = DiffService();
       _report = diffService.compare(_pcSignature!, _phoneSignature!);
+      DebugLogService.instance.status(
+        '差异比较完成: 新增 ${_report!.added.length} / 更新 ${_report!.updated.length} / 可删除 ${_report!.removed.length} / 未变 ${_report!.unchanged}',
+      );
       setState(() {});
     }
   }
@@ -259,6 +275,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final sig = _phoneSignature;
     if (sig == null) return;
 
+    DebugLogService.instance.operation('开始导出特征文件');
     setState(() => _isExporting = true);
     try {
       final jsonStr = const JsonEncoder.withIndent('  ').convert(sig.toJson());
@@ -273,6 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (outputPath != null && mounted) {
+        DebugLogService.instance.status('特征文件导出成功: $outputPath');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('特征文件已导出到: $outputPath')),
         );
@@ -281,6 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _isExporting = false);
       }
     } catch (e) {
+      DebugLogService.instance.error('特征文件导出失败: $e');
       if (mounted) {
         setState(() => _isExporting = false);
         ScaffoldMessenger.of(context).showSnackBar(

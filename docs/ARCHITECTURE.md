@@ -71,11 +71,14 @@ MusicSync 是一个本地音乐库同步工具，帮助用户在电脑和手机�
 | 差异服务 | `lib/services/diff_service.dart` | 三方差异比较 |
 | 导入服务 | `lib/services/import_service.dart` | PC 签名文件导入 |
 | 配置服务 | `lib/services/config_service.dart` | Hive 配置读写 |
+| 调试日志服务 | `lib/services/debug_log_service.dart` | 本地日志文件存储（每次启动新建会话文件）、状态/操作/报错/信息分级、7 天清理、读取/清空/导出 |
+| 日志条目模型 | `lib/models/debug_log_entry.dart` | 日志级别与日志条目 |
 | 主页 | `lib/screens/home_screen.dart` | 状态概览 |
 | 扫描页 | `lib/screens/scan_screen.dart` | 本地扫描进度 |
 | 导入页 | `lib/screens/import_screen.dart` | 导入 PC 签名 |
 | 差异页 | `lib/screens/diff_screen.dart` | 差异分类展示 |
-| 设置页 | `lib/screens/settings_screen.dart` | 路径配置、扫描参数 |
+| 设置页 | `lib/screens/settings_screen.dart` | 路径配置、扫描参数、调试开关 |
+| 日志弹窗 | `lib/widgets/debug_log_dialog.dart` | 日志展示、虚拟列表分页、实时刷新、导出、清空 |
 
 ## 4. 数据流
 
