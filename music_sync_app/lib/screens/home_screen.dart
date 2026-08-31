@@ -29,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
   SyncReport? _report;
   bool _isScanning = false;
   bool _isExporting = false;
+  ScanProgress? _scanProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
             onScan: _scanPhone,
             isScanning: _isScanning,
             isExporting: _isExporting,
+            scanProgress: _scanProgress,
             onExport: (_phoneSignature != null && _phoneSignature!.scanSummary.totalFiles > 0)
                 ? _exportPhoneSignature
                 : null,
@@ -91,6 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
     VoidCallback? onExport,
     bool isScanning = false,
     bool isExporting = false,
+    ScanProgress? scanProgress,
   }) {
     return Card(
       child: Padding(
@@ -123,6 +126,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icon(isScanning ? Icons.hourglass_top : Icons.refresh),
                 label: Text(isScanning ? '扫描中...' : '扫描本机音乐'),
               ),
+            if (isScanning && scanProgress != null) ...[
+              const SizedBox(height: 12),
+              if (scanProgress.phase == ScanPhase.counting)
+                const LinearProgressIndicator()
+              else
+                LinearProgressIndicator(value: scanProgress.progress),
+              const SizedBox(height: 8),
+              Text(
+                scanProgress.phase == ScanPhase.counting
+                    ? '正在统计文件总数...'
+                    : '正在扫描 ${scanProgress.completed}/${scanProgress.total}：${scanProgress.currentFile}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
             if (onImport != null)
               FilledButton.icon(
                 onPressed: onImport,
@@ -226,22 +245,32 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     DebugLogService.instance.operation('开始扫描本机音乐: ${config.musicFolderPath}');
-    setState(() => _isScanning = true);
+    setState(() {
+      _isScanning = true;
+      _scanProgress = null;
+    });
     try {
       final scanner = ScannerService();
       final sig = await scanner.scanDirectory(
         config.musicFolderPath,
         computeHash: config.enableHashComputation,
+        onProgress: (progress) {
+          if (mounted) setState(() => _scanProgress = progress);
+        },
       );
       DebugLogService.instance.status('扫描完成: 共 ${sig.scanSummary.totalFiles} 首');
       setState(() {
         _phoneSignature = sig;
         _isScanning = false;
+        _scanProgress = null;
       });
       _computeDiff();
     } catch (e) {
       DebugLogService.instance.error('扫描失败: $e');
-      setState(() => _isScanning = false);
+      setState(() {
+        _isScanning = false;
+        _scanProgress = null;
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('扫描失败: $e')),
