@@ -9,10 +9,46 @@ import '../utils/constants.dart';
 import 'debug_log_service.dart';
 import 'hash_utils.dart';
 
+/// 扫描阶段：统计文件总数 / 扫描处理中。
+enum ScanPhase { counting, scanning }
+
+/// 扫描进度快照，用于向 UI 实时上报扫描进展。
+class ScanProgress {
+  /// 当前阶段：`counting`（统计总数）或 `scanning`（逐文件处理）。
+  final ScanPhase phase;
+
+  /// 已完成处理的数量（`scanning` 阶段有效）。
+  final int completed;
+
+  /// 统计出的音频文件总数（`counting` 阶段为 0）。
+  final int total;
+
+  /// 当前正在处理的文件相对路径（`scanning` 阶段有效，`counting` 阶段为空）。
+  final String currentFile;
+
+  const ScanProgress({
+    required this.phase,
+    this.completed = 0,
+    this.total = 0,
+    this.currentFile = '',
+  });
+
+  /// 进度比例（0.0 ~ 1.0），总数为 0 时返回 0.0。
+  double get progress =>
+      total == 0 ? 0.0 : (completed / total).clamp(0.0, 1.0).toDouble();
+}
+
+/// 扫描进度回调类型。
+typedef ScanProgressCallback = void Function(ScanProgress progress);
+
 class ScannerService {
   static const _largeFileThreshold = 100 * 1024 * 1024; // 100 MB
 
-  Future<Signature> scanDirectory(String rootPath, {bool computeHash = true}) async {
+  Future<Signature> scanDirectory(
+    String rootPath, {
+    bool computeHash = true,
+    ScanProgressCallback? onProgress,
+  }) async {
     final stopwatch = Stopwatch()..start();
 
     final dir = Directory(rootPath);
@@ -21,7 +57,11 @@ class ScannerService {
     }
 
     final entries = <FileEntry>[];
-    debugPrint('扫描开始: $rootPath');
+
+    // 先统计音频文件总数，作为后续扫描进度分母
+    onProgress?.call(const ScanProgress(phase: ScanPhase.counting));
+    final total = await _countAudioFiles(dir);
+    debugPrint('扫描开始: $rootPath（音频文件总数: $total）');
     DebugLogService.instance.operation('扫描开始: $rootPath');
     try {
       final allFiles = await dir.list(recursive: true).toList();
@@ -35,7 +75,7 @@ class ScannerService {
       debugPrint('⚠ 无法列出目录内容: $e');
       DebugLogService.instance.error('无法列出目录内容: $e');
     }
-    await _scanDir(dir, dir, entries, computeHash);
+    await _scanDir(dir, dir, entries, computeHash, total, onProgress);
 
     entries.sort((a, b) => a.relativePath.compareTo(b.relativePath));
 
@@ -71,6 +111,8 @@ class ScannerService {
     Directory dir,
     List<FileEntry> result,
     bool computeHash,
+    int total,
+    ScanProgressCallback? onProgress,
   ) async {
     final countBefore = result.length;
     await for (final entity in dir.list(recursive: false)) {
@@ -97,12 +139,31 @@ class ScannerService {
             durationMs: 0,
           ),
         ));
+
+        // 每处理完一个音频文件上报一次进度，result.length 即全局已完成数
+        onProgress?.call(ScanProgress(
+          phase: ScanPhase.scanning,
+          completed: result.length,
+          total: total,
+          currentFile: relativePath,
+        ));
       } else if (entity is Directory) {
-        await _scanDir(root, entity, result, computeHash);
+        await _scanDir(root, entity, result, computeHash, total, onProgress);
       }
     }
     debugPrint('_scanDir 完成: ${dir.path}, 音频文件: ${result.length - countBefore}');
     DebugLogService.instance.info('_scanDir 完成: ${dir.path}, 音频文件: ${result.length - countBefore}');
+  }
+
+  /// 递归统计目录下符合 [audioExtensions] 的音频文件总数。
+  Future<int> _countAudioFiles(Directory dir) async {
+    var count = 0;
+    await for (final entity in dir.list(recursive: true)) {
+      if (entity is! File) continue;
+      final ext = entity.path.split('.').lastOrNull?.toLowerCase() ?? '';
+      if (audioExtensions.contains(ext)) count++;
+    }
+    return count;
   }
 
   Future<String> _computeHash(String filePath, int fileSize) async {
