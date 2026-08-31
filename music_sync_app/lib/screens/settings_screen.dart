@@ -48,6 +48,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
           _buildAppearanceSection(),
           const SizedBox(height: 12),
+          _buildDebugSection(),
+          const SizedBox(height: 12),
           _buildAboutSection(),
         ],
       ),
@@ -92,8 +94,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: _autoDetect,
               onChanged: (v) {
                 setState(() => _autoDetect = v);
-                ConfigService.instance.config.autoDetectMusicFolder = v;
-                ConfigService.instance.save();
+                ConfigService.instance.updateAutoDetectMusicFolder(v);
               },
               dense: true,
             ),
@@ -179,12 +180,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: Text(ext),
                   selected: selected,
                   onSelected: (v) {
+                    final next = List<String>.from(config.scanExtensions);
                     if (v) {
-                      config.scanExtensions.add(ext);
+                      next.add(ext);
                     } else {
-                      config.scanExtensions.remove(ext);
+                      next.remove(ext);
                     }
-                    ConfigService.instance.save();
+                    ConfigService.instance.updateScanExtensions(next);
                     setState(() {});
                   },
                 );
@@ -222,10 +224,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
               selected: {config.themeMode},
               onSelectionChanged: (v) {
-                config.themeMode = v.first;
-                ConfigService.instance.save();
+                ConfigService.instance.updateTheme(v.first);
                 setState(() {});
               },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDebugSection() {
+    final config = ConfigService.instance.config;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.bug_report_outlined, size: 22),
+                SizedBox(width: 8),
+                Text('调试',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              title: const Text('调试日志'),
+              subtitle: const Text('开启后在主页设置按钮旁显示日志入口'),
+              value: config.enableDebugLog,
+              onChanged: (v) {
+                ConfigService.instance.updateDebugLog(v);
+                setState(() {});
+              },
+              contentPadding: EdgeInsets.zero,
+              dense: true,
             ),
           ],
         ),
