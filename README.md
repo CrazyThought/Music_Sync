@@ -292,6 +292,15 @@ flutter --version
 flutter upgrade  # 如需升级
 ```
 
+<br />
+
+**Flutter端 `Got TLS error trying to find package`报错**
+
+```Shell
+#切换镜像源
+$env:PUB_HOSTED_URL="https://pub.dev"; $env:FLUTTER_STORAGE_BASE_URL="https://storage.googleapis.com"; flutter pub get
+```
+
 ### Flutter 端 `flutter run` 报 `No supported devices connected`
 
 没有连接 Android 设备或启动模拟器。如果要在 Windows 桌面运行：
