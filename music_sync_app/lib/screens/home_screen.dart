@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:audioplayers/audioplayers.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
@@ -265,6 +266,10 @@ class _HomeScreenState extends State<HomeScreen> {
         _scanProgress = null;
       });
       _computeDiff();
+      // 播放扫描完成提示音，播完后自动释放播放器，避免资源泄漏
+      final alertPlayer = AudioPlayer();
+      alertPlayer.onPlayerComplete.listen((_) => alertPlayer.dispose());
+      await alertPlayer.play(AssetSource('alert.mp3'));
     } catch (e) {
       DebugLogService.instance.error('扫描失败: $e');
       setState(() {
