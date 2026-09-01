@@ -66,14 +66,14 @@ MusicSync 是一个本地音乐库同步工具，帮助用户在电脑和手机�
 | 应用入口 | `lib/main.dart` | Flutter 应用启动、初始化 |
 | 应用配置 | `lib/app.dart` | MaterialApp、路由、主题 |
 | 数据模型 | `lib/models/` | 签名、文件条目、比较报告、配置 |
-| 扫描服务 | `lib/services/scanner_service.dart` | 手机端文件夹扫描 |
+| 扫描服务 | `lib/services/scanner_service.dart` | 手机端文件夹扫描、统计音频总数与逐文件进度上报 |
 | 签名服务 | `lib/services/signature_service.dart` | 签名文件读写 |
 | 差异服务 | `lib/services/diff_service.dart` | 三方差异比较 |
 | 导入服务 | `lib/services/import_service.dart` | PC 签名文件导入 |
 | 配置服务 | `lib/services/config_service.dart` | Hive 配置读写 |
 | 调试日志服务 | `lib/services/debug_log_service.dart` | 本地日志文件存储（每次启动新建会话文件）、状态/操作/报错/信息分级、7 天清理、读取/清空/导出 |
 | 日志条目模型 | `lib/models/debug_log_entry.dart` | 日志级别与日志条目 |
-| 主页 | `lib/screens/home_screen.dart` | 状态概览 |
+| 主页 | `lib/screens/home_screen.dart` | 状态概览、扫描进度展示 |
 | 扫描页 | `lib/screens/scan_screen.dart` | 本地扫描进度 |
 | 导入页 | `lib/screens/import_screen.dart` | 导入 PC 签名 |
 | 差异页 | `lib/screens/diff_screen.dart` | 差异分类展示 |
