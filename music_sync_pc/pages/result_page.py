@@ -18,6 +18,13 @@ _COLUMN_HEADINGS = ("#", "文件名", "艺术家 / 专辑 / 标题", "大小 / �
 _TREE_STYLE_NAME = "Result.Treeview"
 _TAB_NAMES = ("新增", "更新", "删除")
 
+# 差异判定维度 id → 中文说明：diff_service 在"更新"条目内部键 _diff_dims 中记录的
+# 维度 id（与 utils/constants.py 保持一致），此处映射为可读文案供 UI 展示触发依据
+_DIFF_DIM_LABELS: dict[str, str] = {
+    "file_size": "文件大小",
+    "content_hash": "内容哈希",
+}
+
 
 class ResultPage(ctk.CTkFrame):
     def __init__(self, master: Any, **kwargs: Any) -> None:
@@ -218,16 +225,22 @@ class ResultPage(ctk.CTkFrame):
         """清空 Treeview 并用 entries 数据重新填充。"""
         tree.delete(*tree.get_children())
 
-        for i, entry in enumerate(entries):
+        for i, raw_entry in enumerate(entries):
+            # diff_service 会给"更新"条目附加内部键 _diff_dims（触发更新的判定维度 id）。
+            # 先浅拷贝剔除该内部键，避免其泄漏进标准字段渲染，且不改动上游传入的原始条目
+            entry = dict(raw_entry)
+            diff_dims: list[str] | None = entry.pop("_diff_dims", None)
+
             meta = entry.get("audio_meta", {})
             path = entry.get("relative_path", "")
             artist = meta.get("artist", "")
             album = meta.get("album", "")
             title = meta.get("title", "")
             size = format_size(entry.get("file_size", 0))
-            duration = meta.get("duration_secs")
+            duration_ms = meta.get("duration_ms") or 0
+            duration_secs = duration_ms // 1000
             duration_str = (
-                f"{int(duration // 60)}:{int(duration % 60):02d}" if duration else "-"
+                f"{duration_secs // 60}:{duration_secs % 60:02d}" if duration_ms else "-"
             )
             bitrate = (
                 f"{meta.get('bitrate_kbps', '-')}kbps" if meta.get("bitrate_kbps") else "-"
@@ -235,6 +248,10 @@ class ResultPage(ctk.CTkFrame):
 
             info_text = " | ".join(filter(None, [artist, album, title]))
             details_text = f"大小: {size}  |  时长: {duration_str}  |  音质: {bitrate}"
+            if diff_dims:
+                # 仅在"更新"行存在内部依据键：按映射输出可读文案，未知 id 原样兜底
+                basis = "、".join(_DIFF_DIM_LABELS.get(dim, dim) for dim in diff_dims)
+                details_text += f" | 依据: {basis}"
 
             tag = "even" if i % 2 == 0 else "odd"
             tree.insert("", "end", values=(i + 1, path, info_text, details_text), tags=(tag,))

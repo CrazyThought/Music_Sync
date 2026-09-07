@@ -297,7 +297,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void _computeDiff() {
     if (_phoneSignature != null && _pcSignature != null) {
       final diffService = DiffService();
-      _report = diffService.compare(_pcSignature!, _phoneSignature!);
+      _report = diffService.compare(
+        _pcSignature!,
+        _phoneSignature!,
+        judgmentDims: ConfigService.instance.config.diffJudgmentDims,
+      );
       DebugLogService.instance.status(
         '差异比较完成: 新增 ${_report!.added.length} / 更新 ${_report!.updated.length} / 可删除 ${_report!.removed.length} / 未变 ${_report!.unchanged}',
       );

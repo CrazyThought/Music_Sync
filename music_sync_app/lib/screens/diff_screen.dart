@@ -122,6 +122,13 @@ class _DiffScreenState extends State<DiffScreen> {
                   'PC 端: ${_formatSize(pair.pcFile.fileSize)} | ${_formatDate(pair.pcFile.modifiedAt)}',
                   style: const TextStyle(color: Color(0xFF1976D2), fontSize: 12),
                 ),
+                // 触发"更新"判定的维度原因：将维度 id 映射为可读文案。
+                if (pair.reasonDims.isNotEmpty)
+                  Text(
+                    '差异原因: ${pair.reasonDims.map(_diffDimensionLabel).join(' / ')}',
+                    style: TextStyle(
+                        color: Colors.orange.shade700, fontSize: 12),
+                  ),
               ],
             ),
             leading: const Icon(Icons.update, color: Color(0xFF1976D2)),
@@ -135,6 +142,18 @@ class _DiffScreenState extends State<DiffScreen> {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  /// 将判定维度 id 映射为可读中文名；未知 id 原样返回。
+  String _diffDimensionLabel(String id) {
+    switch (id) {
+      case diffDimensionFileSize:
+        return '文件大小';
+      case diffDimensionContentHash:
+        return '内容哈希';
+      default:
+        return id;
+    }
   }
 
   String _formatDate(int msSinceEpoch) {
