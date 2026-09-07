@@ -182,7 +182,7 @@ class ScanPage(ctk.CTkFrame):
                 except (OSError, ValueError, FileNotFoundError):
                     pass
 
-            result = scanner.scan(previous)
+            result = scanner.scan(previous, compute_hash=self.config.compute_hash)
             self.scan_result = result
 
             if previous:
@@ -259,8 +259,10 @@ class ScanPage(ctk.CTkFrame):
         sig_path = output_dir / "pc_signature.json"
         try:
             save_signature(self.scan_result, sig_path)
+            logger.info("特征文件已导出: %s", sig_path)
             self._status_label.configure(text=f"签名文件已导出: {sig_path}")
         except (OSError, ValueError) as e:
+            logger.warning("特征文件导出失败: %s", e)
             self._status_label.configure(text=f"导出失败: {e}")
 
     def _import_signature(self) -> None:
@@ -293,6 +295,7 @@ class ScanPage(ctk.CTkFrame):
                 # 没有扫描结果时，导入作为当前结果
                 self.scan_result = imported
 
+            logger.info("特征文件导入成功: %s（%d 首）", file_path, total_files)
             self._status_label.configure(text=f"导入成功：{total_files} 首歌曲")
             self._export_btn.configure(state="normal")
         except (OSError, ValueError, FileNotFoundError) as e:
