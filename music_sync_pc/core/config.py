@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,10 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         "extensions": ["mp3", "flac", "wav", "m4a", "ogg", "wma", "aac", "opus", "ape", "wv"],
         "large_file_threshold_mb": LARGE_FILE_THRESHOLD_BYTES // (1024 * 1024),
         "chunk_hash_size_kb": CHUNK_HASH_SIZE_BYTES // 1024,
+        "compute_hash": False,
+    },
+    "debug_settings": {
+        "log_enabled": False,
     },
     "appearance": {
         "theme": "dark",
@@ -147,6 +152,42 @@ class ConfigManager:
     def chunk_hash_size(self) -> int:
         kb = self._data.get("scan_settings", {}).get("chunk_hash_size_kb", 128)
         return int(kb) * 1024
+
+    @property
+    def compute_hash(self) -> bool:
+        """哈希计算开关：是否读取文件内容计算内容哈希。
+
+        缺省回退 False（关闭，与手机端 enableHashComputation=false 对齐）。
+        """
+        return bool(self._data.get("scan_settings", {}).get("compute_hash", False))
+
+    @compute_hash.setter
+    def compute_hash(self, value: bool) -> None:
+        # 记录变更日志需使用写入前的旧值
+        old = self.compute_hash
+        self._data.setdefault("scan_settings", {})["compute_hash"] = bool(value)
+        self.save()
+        logging.getLogger("musicsync").info(
+            "设置变更 - 哈希计算: %s → %s", old, bool(value)
+        )
+
+    @property
+    def debug_log_enabled(self) -> bool:
+        """调试日志开关：是否在顶部标签栏显示「调试日志」入口。
+
+        缺省回退 False（关闭），日志采集始终进行，不依赖该开关。
+        """
+        return bool(self._data.get("debug_settings", {}).get("log_enabled", False))
+
+    @debug_log_enabled.setter
+    def debug_log_enabled(self, value: bool) -> None:
+        # 记录变更日志需使用写入前的旧值
+        old = self.debug_log_enabled
+        self._data.setdefault("debug_settings", {})["log_enabled"] = bool(value)
+        self.save()
+        logging.getLogger("musicsync").info(
+            "设置变更 - 调试日志: %s → %s", old, bool(value)
+        )
 
     @property
     def raw(self) -> dict[str, Any]:

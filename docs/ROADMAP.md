@@ -95,9 +95,9 @@
 - [x] 2.3.7 实现可配置差异判定维度（取代「哈希值判断」单开关）：设置页新增「差异比较」区，file_size 恒参与（不可取消），content_hash 等可选维度以标签多选参与；两侧该维度均有效才启用、任一单侧缺值自动放行，启用维度取 AND。PC 端与手机端语义一致。见 `.trae/specs/configurable-diff-judgment`
 
 ### 2.4 PC 端设置增强
-- [ ] 2.4.1 实现「哈希计算开关」：设置页新增开关，关闭时扫描跳过内容哈希，生成 `content_hash=''`、`content_hash_algo='none'`、`fingerprint_algorithms.content='none'`（与移动端对齐）
+- [x] 2.4.1 实现「哈希计算开关」（默认关闭，与手机端对齐）：设置页新增开关，关闭时扫描跳过内容哈希，生成 `content_hash=''`、`content_hash_algo='none'`、`fingerprint_algorithms.content='none'`。见 `.trae/specs/add-pc-hash-debug-switches`
 - [x] 2.4.2 实现可配置差异判定维度（PC 端）：设置页新增「差异比较」区，content_hash 可勾选参与；判定语义与手机端完全一致（file_size 恒参与 + 双侧有效才启用 + AND + 单侧缺值放行）。见 `.trae/specs/configurable-diff-judgment`
-- [ ] 2.4.3 实现「调试日志开关」：设置页新增开关，控制调试日志的采集与展示
+- [x] 2.4.3 实现「调试日志开关」（入口在顶部标签栏）：设置页新增开关，控制顶部「调试日志」第 4 页签的显示/隐藏（日志始终采集）；日志页与设置页支持拖动条滚动。见 `.trae/specs/add-pc-hash-debug-switches`
 
 ---
 

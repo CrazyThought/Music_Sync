@@ -15,12 +15,18 @@ class SettingsPage(ctk.CTkFrame):
         super().__init__(master, **kwargs)
         self.config = config
         self._theme_callback: callable | None = None
+        self._debug_log_callback: callable | None = None
         self._build_ui()
 
     def _build_ui(self) -> None:
+        # 页面主体放入可滚动容器，纵向连续排布各设置区块，窗口高度不足时可滚动查看
         self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+        self._scroll = ctk.CTkScrollableFrame(self, fg_color="transparent")
+        self._scroll.grid(row=0, column=0, sticky="nsew")
+        self._scroll.grid_columnconfigure(0, weight=1)
 
-        scan_frame = ctk.CTkFrame(self)
+        scan_frame = ctk.CTkFrame(self._scroll)
         scan_frame.grid(row=0, column=0, padx=15, pady=(15, 5), sticky="ew")
 
         ctk.CTkLabel(scan_frame, text="扫描设置",
@@ -44,19 +50,37 @@ class SettingsPage(ctk.CTkFrame):
         self._threshold_combo.set(str(threshold_mb))
         self._threshold_combo.grid(row=2, column=1, padx=15, pady=5, sticky="w")
 
-        ctk.CTkLabel(scan_frame, text="扩展名过滤（空格分隔）").grid(
+        # 「哈希计算」开关：切换即时写回配置，setter 内部负责持久化与日志，无需手动 save
+        ctk.CTkLabel(scan_frame, text="哈希计算").grid(
             row=3, column=0, padx=15, pady=5, sticky="w")
+        self._hash_switch = ctk.CTkSwitch(
+            scan_frame, text="", command=self._on_compute_hash_toggled)
+        if self.config.compute_hash:
+            self._hash_switch.select()
+        else:
+            self._hash_switch.deselect()
+        self._hash_switch.grid(row=3, column=1, padx=15, pady=5, sticky="w")
+
+        ctk.CTkLabel(
+            scan_frame,
+            text="默认关闭；关闭时扫描跳过内容哈希计算，生成无哈希签名（content_hash=''）。"
+                 "如需内容哈希维度差异比较请在扫描时开启。",
+            font=ctk.CTkFont(size=11),
+        ).grid(row=4, column=0, columnspan=2, padx=15, pady=5, sticky="w")
+
+        ctk.CTkLabel(scan_frame, text="扩展名过滤（空格分隔）").grid(
+            row=5, column=0, padx=15, pady=5, sticky="w")
         extensions_str = " ".join(self.config.extensions)
         self._ext_entry = ctk.CTkEntry(scan_frame, width=300)
         self._ext_entry.insert(0, extensions_str)
-        self._ext_entry.grid(row=3, column=1, padx=15, pady=5, sticky="w")
+        self._ext_entry.grid(row=5, column=1, padx=15, pady=5, sticky="w")
 
         ctk.CTkButton(scan_frame, text="保存设置", width=100,
                       command=self._save_settings).grid(
-            row=4, column=0, columnspan=2, padx=15, pady=15)
+            row=6, column=0, columnspan=2, padx=15, pady=15)
 
         # ---- 差异比较设置区：file_size 强制参与；可选维度由 config.judgment_dims 决定 ----
-        diff_frame = ctk.CTkFrame(self)
+        diff_frame = ctk.CTkFrame(self._scroll)
         diff_frame.grid(row=1, column=0, padx=15, pady=5, sticky="ew")
 
         ctk.CTkLabel(diff_frame, text="差异比较",
@@ -81,11 +105,11 @@ class SettingsPage(ctk.CTkFrame):
 
         ctk.CTkLabel(
             diff_frame,
-            text="提示：哈希维度需两侧签名均含内容哈希才生效，任一侧缺值自动跳过该维度",
+            text="提示：内容哈希判定需在扫描设置开启「哈希计算」，且 PC/手机两侧签名均含有效哈希才生效；任一侧缺值自动跳过该维度",
             font=ctk.CTkFont(size=11),
         ).grid(row=3, column=0, columnspan=2, padx=15, pady=(0, 15), sticky="w")
 
-        appearance_frame = ctk.CTkFrame(self)
+        appearance_frame = ctk.CTkFrame(self._scroll)
         appearance_frame.grid(row=2, column=0, padx=15, pady=5, sticky="ew")
 
         ctk.CTkLabel(appearance_frame, text="外观",
@@ -102,8 +126,32 @@ class SettingsPage(ctk.CTkFrame):
                      font=ctk.CTkFont(size=11)).grid(
             row=1, column=1, padx=5, pady=5, sticky="w")
 
-        info_frame = ctk.CTkFrame(self)
-        info_frame.grid(row=3, column=0, padx=15, pady=15, sticky="ew")
+        # ---- 调试设置区：控制顶部标签栏是否显示「调试日志」页，实时查看运行日志 ----
+        debug_frame = ctk.CTkFrame(self._scroll)
+        debug_frame.grid(row=3, column=0, padx=15, pady=5, sticky="ew")
+
+        ctk.CTkLabel(debug_frame, text="调试",
+                     font=ctk.CTkFont(size=15, weight="bold")).grid(
+            row=0, column=0, columnspan=2, padx=15, pady=(15, 10), sticky="w")
+
+        ctk.CTkLabel(debug_frame, text="调试日志").grid(
+            row=1, column=0, padx=15, pady=5, sticky="w")
+        self._debug_switch = ctk.CTkSwitch(
+            debug_frame, text="", command=self._on_debug_log_toggled)
+        if self.config.debug_log_enabled:
+            self._debug_switch.select()
+        else:
+            self._debug_switch.deselect()
+        self._debug_switch.grid(row=1, column=1, padx=15, pady=5, sticky="w")
+
+        ctk.CTkLabel(
+            debug_frame,
+            text="开启后在顶部标签栏显示「调试日志」页，实时查看运行日志",
+            font=ctk.CTkFont(size=11),
+        ).grid(row=2, column=0, columnspan=2, padx=15, pady=(0, 15), sticky="w")
+
+        info_frame = ctk.CTkFrame(self._scroll)
+        info_frame.grid(row=4, column=0, padx=15, pady=15, sticky="ew")
 
         ctk.CTkLabel(info_frame, text="关于 MusicSync",
                      font=ctk.CTkFont(size=15, weight="bold")).grid(
@@ -117,6 +165,28 @@ class SettingsPage(ctk.CTkFrame):
 
     def set_theme_callback(self, callback: callable) -> None:
         self._theme_callback = callback
+
+    def set_debug_log_callback(self, callback: callable) -> None:
+        """注册调试日志开关回调，供上层在开关切换时联动显示/隐藏「调试日志」页。
+
+        Args:
+            callback: 接收 bool 的回调（开关切换后的目标状态），可为 None 取消。
+        """
+        self._debug_log_callback = callback
+
+    def _on_compute_hash_toggled(self) -> None:
+        """哈希计算开关回调：CTkSwitch.get() 返回 0/1，bool() 归一化后写回配置。
+
+        compute_hash setter 内部负责持久化与变更日志，无需在此手动 save。
+        """
+        self.config.compute_hash = bool(self._hash_switch.get())
+
+    def _on_debug_log_toggled(self) -> None:
+        """调试日志开关回调：先持久化配置，再通知上层联动顶部「调试日志」页显隐。"""
+        enabled = bool(self._debug_switch.get())
+        self.config.debug_log_enabled = enabled
+        if self._debug_log_callback:
+            self._debug_log_callback(enabled)
 
     def _on_workers_changed(self, value: str) -> None:
         try:

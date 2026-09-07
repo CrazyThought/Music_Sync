@@ -1,8 +1,16 @@
-"""结果页面 —— 分类展示扫描差异（新增/删除/更新），使用 ttk.Treeview 高性能表格。"""
+"""结果页面 —— 分类展示扫描差异（新增/删除/更新），使用 ttk.Treeview 高性能表格。
+
+自适应布局说明：
+- 列宽按「当前标签页内容」估算的最长文本自适应扩张；内容短时各列均分填满可视宽度，
+  空列表/短列表不会超出窗口，也不出现无效的横向滚动条。
+- 仅当内容实际宽度超过 Treeview 可视宽度时才显示横向滚动条，此时列宽保持内容宽度，
+  可通过横向滚动查看被拉长的完整文本。
+"""
 
 from __future__ import annotations
 
 import logging
+import tkinter.font as tkfont
 import tkinter.ttk as ttk
 from typing import Any
 
@@ -18,6 +26,16 @@ _COLUMN_HEADINGS = ("#", "文件名", "艺术家 / 专辑 / 标题", "大小 / �
 _TREE_STYLE_NAME = "Result.Treeview"
 _TAB_NAMES = ("新增", "更新", "删除")
 
+# 列表字体：标题与行内容统一 14px，与页面其它文本（摘要数字）字号保持一致
+_TREE_FONT_FAMILY: str = "Segoe UI"
+_TREE_FONT_SIZE: int = 14
+_TREE_ROW_FONT: tuple[str, int] = (_TREE_FONT_FAMILY, _TREE_FONT_SIZE)
+_TREE_HEADING_FONT: tuple[str, int, str] = (_TREE_FONT_FAMILY, _TREE_FONT_SIZE, "bold")
+
+_INDEX_COL_WIDTH: int = 60          # 序号列固定宽度
+_DATA_COLS: tuple[str, str, str] = ("filename", "info", "details")
+_COL_TEXT_PAD: int = 34             # 单元格文本左右留白 + 安全余量，避免文本贴边/被裁切
+
 # 差异判定维度 id → 中文说明：diff_service 在"更新"条目内部键 _diff_dims 中记录的
 # 维度 id（与 utils/constants.py 保持一致），此处映射为可读文案供 UI 展示触发依据
 _DIFF_DIM_LABELS: dict[str, str] = {
@@ -31,10 +49,41 @@ class ResultPage(ctk.CTkFrame):
         super().__init__(master, **kwargs)
         self.diff_report: DiffReport | None = None
         self._current_theme: str = ctk.get_appearance_mode()
+        self._current_tab: str = _TAB_NAMES[0]
         self._tab_wrappers: dict[str, ctk.CTkFrame] = {}
         self._tab_trees: dict[str, ttk.Treeview] = {}
+        self._tab_xscrollbars: dict[str, ctk.CTkScrollbar] = {}
+        # 各标签页按内容估算的列宽（key: 列名），用于响应式布局；空数据时为标题宽度
+        self._needed_widths: dict[str, dict[str, int]] = {}
+        self._init_measure_fonts()
         self._build_ui()
         self._setup_tree_style()
+
+    # ------------------------------------------------------------------
+    # 字体测量
+    # ------------------------------------------------------------------
+
+    def _init_measure_fonts(self) -> None:
+        """初始化文本宽度估算用的测量字体（失败时回退 Tk 默认字体）。"""
+        try:
+            self._row_measure_font = tkfont.Font(font=_TREE_ROW_FONT)
+        except Exception:
+            self._row_measure_font = tkfont.nametofont("TkDefaultFont")
+        try:
+            self._heading_measure_font = tkfont.Font(font=_TREE_HEADING_FONT)
+        except Exception:
+            self._heading_measure_font = tkfont.nametofont("TkDefaultFont")
+
+    @staticmethod
+    def _text_width_px(text: str, font: tkfont.Font) -> int:
+        """估算文本在指定字体下的像素宽度。
+
+        直接使用 Tk 字体的真实度量（Windows 上 CJK 字形由系统回退字体
+        参与度量，实测与显示宽度一致），结果最贴近实际渲染宽度。
+        """
+        if not text:
+            return 0
+        return int(font.measure(text))
 
     # ------------------------------------------------------------------
     # UI 构建
@@ -88,7 +137,7 @@ class ResultPage(ctk.CTkFrame):
             command=self._on_tab_switch,
         )
         self._tab_bar.grid(row=0, column=0, padx=5, pady=(0, 2), sticky="ew")
-        self._tab_bar.set("新增")
+        self._tab_bar.set(_TAB_NAMES[0])
 
         # 内容容器 —— 紧贴分段按钮下方
         self._content_frame = ctk.CTkFrame(tab_frame, fg_color="transparent")
@@ -96,14 +145,17 @@ class ResultPage(ctk.CTkFrame):
         self._content_frame.grid_columnconfigure(0, weight=1)
         self._content_frame.grid_rowconfigure(0, weight=1)
 
-        # 为每个标签创建 Treeview + 滚动条
+        # 为每个标签创建 Treeview + 滚动条，并绑定尺寸自适应
         for name in _TAB_NAMES:
             wrapper, tree = self._create_tree_pane(name)
             self._tab_wrappers[name] = wrapper
             self._tab_trees[name] = tree
+            wrapper.bind("<Configure>", lambda e, n=name: self._on_pane_configure(e, n))
 
-        # 默认显示"新增"
-        self._show_tab("新增")
+        # 默认显示"新增"，并把空数据的初始列宽设为标题宽度
+        self._show_tab(_TAB_NAMES[0])
+        for name in _TAB_NAMES:
+            self._needed_widths[name] = self._compute_heading_needed()
 
     # ------------------------------------------------------------------
     # Treeview 面板
@@ -130,9 +182,9 @@ class ResultPage(ctk.CTkFrame):
         scrollbar_y.grid(row=0, column=1, sticky="ns")
         tree.configure(yscrollcommand=scrollbar_y.set)
 
-        # 横向滚动条
+        # 横向滚动条：初始隐藏，仅当内容宽度超过可视宽度时才显示（由 _apply_tree_layout 控制）
         scrollbar_x = ctk.CTkScrollbar(wrapper, orientation="horizontal", command=tree.xview)
-        scrollbar_x.grid(row=1, column=0, sticky="ew")
+        self._tab_xscrollbars[tab_name] = scrollbar_x
         tree.configure(xscrollcommand=scrollbar_x.set)
 
         # 列配置
@@ -141,24 +193,155 @@ class ResultPage(ctk.CTkFrame):
         tree.heading("info", text=_COLUMN_HEADINGS[2])
         tree.heading("details", text=_COLUMN_HEADINGS[3])
 
-        tree.column("index", width=60, minwidth=60, stretch=False, anchor="center")
-        tree.column("filename", width=320, minwidth=180, stretch=True, anchor="w")
-        tree.column("info", width=300, minwidth=180, stretch=True, anchor="w")
-        tree.column("details", width=280, minwidth=240, stretch=True, anchor="w")
+        tree.column("index", width=_INDEX_COL_WIDTH, minwidth=_INDEX_COL_WIDTH,
+                    stretch=False, anchor="center")
+        # 数据列 stretch=False：列宽完全由 _apply_tree_layout 按内容与窗口宽度控制，
+        # 避免 ttk 在内容超宽时自动压缩列宽（否则无法通过横向滚动查看完整内容）
+        for col in _DATA_COLS:
+            tree.column(col, width=100, minwidth=40, stretch=False, anchor="w")
 
         return wrapper, tree
+
+    # ------------------------------------------------------------------
+    # 响应式列宽
+    # ------------------------------------------------------------------
+
+    def _compute_heading_needed(self) -> dict[str, int]:
+        """计算仅含标题时各数据列需要的最小宽度（作为空数据兜底宽度）。"""
+        return {
+            col: self._text_width_px(_COLUMN_HEADINGS[idx], self._heading_measure_font) + _COL_TEXT_PAD
+            for idx, col in enumerate(_DATA_COLS, start=1)
+        }
+
+    def _content_needed(
+        self,
+        rows: list[tuple[str, str, str]],
+    ) -> dict[str, int]:
+        """根据内容最长文本估算各数据列宽度，并与标题宽度取较大值。
+
+        Args:
+            rows: 每行按 _DATA_COLS 顺序的 (filename, info, details) 文本元组列表。
+
+        Returns:
+            各数据列（filename/info/details）的估算宽度（像素），已含单元格留白。
+        """
+        heading_raw = {
+            col: self._text_width_px(_COLUMN_HEADINGS[idx], self._heading_measure_font)
+            for idx, col in enumerate(_DATA_COLS, start=1)
+        }
+        max_content = {col: 0 for col in _DATA_COLS}
+        for filename, info, details in rows:
+            for col, text in zip(_DATA_COLS, (filename, info, details)):
+                w = self._text_width_px(text, self._row_measure_font)
+                if w > max_content[col]:
+                    max_content[col] = w
+        return {
+            col: max(max_content[col], heading_raw[col]) + _COL_TEXT_PAD
+            for col in _DATA_COLS
+        }
+
+    def _apply_tree_layout(self, tab_name: str) -> bool:
+        """按当前标签页内容与可视宽度调整列宽及横向滚动条显隐。
+
+        规则：
+        - 内容（估算）总宽不超过可视宽度：各数据列在内容宽度基础上均分
+          剩余空间填满可视宽度，隐藏横向滚动条（内容不会溢出窗口）；
+        - 内容总宽超过可视宽度：各数据列保持内容所需宽度，显示横向滚动条，
+          用户可水平滚动查看完整内容。
+
+        Returns:
+            是否成功完成布局（True 表示树已映射且宽度有效）；树尚未映射
+            时返回 False，等待 <Configure> 事件再布局。
+        """
+        tree = self._tab_trees[tab_name]
+        needed = self._needed_widths.get(tab_name)
+        if needed is None:
+            return False
+        view_width = tree.winfo_width()
+        if view_width is None or view_width <= 1:
+            return False
+
+        total_content = _INDEX_COL_WIDTH + sum(needed.values())
+        if total_content <= view_width:
+            # 内容不超宽：按各列内容宽度占比分摊剩余空间以填满可视宽度，
+            # 长内容列获得更多空间，保证列表贴合窗口且不产生无效横向滚动条
+            extra = view_width - total_content
+            total_needed = sum(needed.values())
+            width_map: list[int] = []
+            allocated = 0
+            for col in _DATA_COLS:
+                share = int(extra * needed[col] / total_needed) if total_needed else 0
+                width_map.append(needed[col] + share)
+                allocated += share
+            width_map[-1] += extra - allocated  # 余数补到最后一列，恰好等于可视宽度
+            for col, w in zip(_DATA_COLS, width_map):
+                tree.column(col, width=w)
+            self._set_xscrollbar_visible(tab_name, False)
+        else:
+            # 内容超宽：保持内容宽度，启用横向滚动
+            for col in _DATA_COLS:
+                tree.column(col, width=needed[col])
+            self._set_xscrollbar_visible(tab_name, True)
+        tree.column("index", width=_INDEX_COL_WIDTH)
+        return True
+
+    def _set_xscrollbar_visible(self, tab_name: str, visible: bool) -> None:
+        """显示或隐藏指定标签页的横向滚动条。"""
+        scrollbar = self._tab_xscrollbars.get(tab_name)
+        if scrollbar is None:
+            return
+        if visible:
+            scrollbar.grid(row=1, column=0, sticky="ew")
+        else:
+            scrollbar.grid_remove()
+
+    def _on_pane_configure(self, event: Any, tab_name: str) -> None:
+        """面板尺寸变化时重新自适应列宽（仅对当前可见面板生效）。
+
+        面板刚映射时树宽度可能尚未就绪（winfo_width 为 1），此时布局会返回
+        False，进入有界轮询重试，待几何信息稳定后补做布局。
+        """
+        if not event.widget.winfo_ismapped():
+            return
+        if not self._apply_tree_layout(tab_name):
+            self._retry_layout_later(tab_name)
+
+    def _retry_layout_later(self, tab_name: str, attempts_left: int = 10) -> None:
+        """有界延迟重试列宽布局，直到树宽度就绪并布局成功。
+
+        Tab/窗口切换时几何布局是分帧完成的，树宽度可能延迟才有效；
+        这里以 60ms 间隔轮询（最多 attempts_left 次），布局成功即停止。
+        """
+        wrapper = self._tab_wrappers.get(tab_name)
+        if wrapper is None or not wrapper.winfo_exists():
+            return
+        if self._apply_tree_layout(tab_name):
+            return
+        if attempts_left <= 0:
+            return
+
+        def _do_retry() -> None:
+            try:
+                self._retry_layout_later(tab_name, attempts_left - 1)
+            except Exception:
+                pass
+
+        self.after(60, _do_retry)
 
     # ------------------------------------------------------------------
     # 标签切换
     # ------------------------------------------------------------------
 
     def _show_tab(self, tab_name: str) -> None:
-        """只显示指定标签的 wrapper，隐藏其余。"""
+        """只显示指定标签的 wrapper，隐藏其余，并调度一次列宽自适应。"""
+        self._current_tab = tab_name
         for name, wrapper in self._tab_wrappers.items():
             if name == tab_name:
                 wrapper.grid(row=0, column=0, sticky="nsew")
             else:
                 wrapper.grid_remove()
+        # 切换后等待面板完成映射再布局（延迟重试覆盖几何未就绪的情况）
+        self._retry_layout_later(tab_name)
 
     def _on_tab_switch(self, value: str) -> None:
         self._show_tab(value)
@@ -188,20 +371,21 @@ class ResultPage(ctk.CTkFrame):
 
         style = ttk.Style()
         style.theme_use("clam")
+        # 行内容与列标题字号统一为 14px，与页面其它文本保持一致
         style.configure(
             _TREE_STYLE_NAME,
             background=bg,
             foreground=fg,
             fieldbackground=field_bg,
             rowheight=50,
-            font=("Segoe UI", 15),
+            font=_TREE_ROW_FONT,
             borderwidth=0,
         )
         style.configure(
             f"{_TREE_STYLE_NAME}.Heading",
             background=heading_bg,
             foreground=fg,
-            font=("Segoe UI", 15, "bold"),
+            font=_TREE_HEADING_FONT,
             borderwidth=0,
         )
         style.map(
@@ -221,9 +405,17 @@ class ResultPage(ctk.CTkFrame):
     # 数据填充
     # ------------------------------------------------------------------
 
-    def _populate_treeview(self, tree: ttk.Treeview, entries: list[dict[str, Any]]) -> None:
-        """清空 Treeview 并用 entries 数据重新填充。"""
+    def _populate_treeview(
+        self,
+        tree: ttk.Treeview,
+        entries: list[dict[str, Any]],
+        tab_name: str,
+    ) -> None:
+        """清空 Treeview 并用 entries 数据重新填充，同时按内容估算列宽。"""
         tree.delete(*tree.get_children())
+
+        # 收集各列渲染文本用于内容宽度估算（只统计，不参与显示）
+        row_texts: list[tuple[str, str, str]] = []
 
         for i, raw_entry in enumerate(entries):
             # diff_service 会给"更新"条目附加内部键 _diff_dims（触发更新的判定维度 id）。
@@ -253,12 +445,32 @@ class ResultPage(ctk.CTkFrame):
                 basis = "、".join(_DIFF_DIM_LABELS.get(dim, dim) for dim in diff_dims)
                 details_text += f" | 依据: {basis}"
 
+            row_texts.append((path, info_text, details_text))
             tag = "even" if i % 2 == 0 else "odd"
             tree.insert("", "end", values=(i + 1, path, info_text, details_text), tags=(tag,))
+
+        # 记录本标签页内容所需宽度并立即自适应；树尚未映射时延迟重试
+        self._needed_widths[tab_name] = self._content_needed(row_texts)
+        if tab_name == self._current_tab and not self._apply_tree_layout(tab_name):
+            self._retry_layout_later(tab_name)
 
     # ------------------------------------------------------------------
     # 公开接口
     # ------------------------------------------------------------------
+
+    def _clear_trees(self) -> None:
+        """清空全部标签页行数据，并把列宽重置为标题宽度兜底。"""
+        for name, tree in self._tab_trees.items():
+            tree.delete(*tree.get_children())
+            self._needed_widths[name] = self._compute_heading_needed()
+        if self._tab_trees.get(self._current_tab) is not None:
+            if not self._apply_tree_layout(self._current_tab):
+                self._retry_layout_later(self._current_tab)
+
+    def refresh_layout(self) -> None:
+        """结果页被激活时刷新当前标签页的列宽布局（适配窗口尺寸）。"""
+        if not self._apply_tree_layout(self._current_tab):
+            self._retry_layout_later(self._current_tab)
 
     def set_diff_report(self, report: DiffReport | None) -> None:
         self.diff_report = report
@@ -269,8 +481,7 @@ class ResultPage(ctk.CTkFrame):
             self._updated_label.configure(text="更新\n0")
             self._removed_label.configure(text="删除\n0")
             self._unchanged_label.configure(text="未变\n-")
-            for tree in self._tab_trees.values():
-                tree.delete(*tree.get_children())
+            self._clear_trees()
             return
 
         logger.info(
@@ -290,6 +501,7 @@ class ResultPage(ctk.CTkFrame):
         if not report.has_changes:
             for tree in self._tab_trees.values():
                 tree.delete(*tree.get_children())
+            self._clear_trees()
             return
 
         logger.info(
@@ -299,9 +511,9 @@ class ResultPage(ctk.CTkFrame):
             len(report.removed),
         )
 
-        self._populate_treeview(self._tab_trees["新增"], report.added)
-        self._populate_treeview(self._tab_trees["更新"], report.updated)
-        self._populate_treeview(self._tab_trees["删除"], report.removed)
+        self._populate_treeview(self._tab_trees["新增"], report.added, "新增")
+        self._populate_treeview(self._tab_trees["更新"], report.updated, "更新")
+        self._populate_treeview(self._tab_trees["删除"], report.removed, "删除")
 
     def on_theme_changed(self, theme: str) -> None:
         """主题切换时重新应用 Treeview 样式。"""

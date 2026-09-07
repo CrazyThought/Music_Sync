@@ -47,17 +47,18 @@ MusicSync 是一个本地音乐库同步工具，帮助用户在电脑和手机�
 | 模块 | 路径 | 职责 |
 |------|------|------|
 | GUI 入口 | `main.py` | 程序启动、单实例检查、异常全局捕获 |
-| 主窗口 | `app.py` | CustomTkinter 主窗口、标签页容器、状态栏 |
+| 主窗口 | `app.py` | CustomTkinter 主窗口、标签页容器、状态栏、动态管理「调试日志」页签显隐 |
 | 扫描页 | `pages/scan_page.py` | 路径配置、扫描触发、进度显示、概览卡片 |
 | 结果页 | `pages/result_page.py` | 分类表格、差异列表、导出操作 |
-| 设置页 | `pages/settings_page.py` | 扫描参数、外观主题 |
-| 扫描引擎 | `services/scanner.py` | 文件夹遍历、增量扫描、并行处理 |
+| 设置页 | `pages/settings_page.py` | 扫描参数、外观主题、哈希计算/调试日志开关（页面可滚动） |
+| 调试日志页 | `pages/debug_log_page.py` | 只读实时日志浏览（环形缓冲轮询、自动滚动、清空） |
+| 扫描引擎 | `services/scanner.py` | 文件夹遍历、增量扫描、并行处理、哈希计算开关 |
 | 签名服务 | `services/signature.py` | 签名文件读写、格式校验 |
 | 音频元数据 | `services/audio_meta.py` | ID3/Vorbis/FLAC 标签提取 |
 | 哈希工具 | `services/hash_utils.py` | xxHash 计算、大文件分块策略 |
 | 差异比较 | `services/diff_service.py` | PC 端自检差异比较 |
-| 配置管理 | `core/config.py` | JSON 配置读写、降级容错 |
-| 日志管理 | `core/logger.py` | 日志文件轮转、分级输出 |
+| 配置管理 | `core/config.py` | JSON 配置读写、降级容错、哈希计算/调试日志开关字段 |
+| 日志管理 | `core/logger.py` | 日志文件轮转、分级输出、内存环形缓冲（实时日志采集） |
 
 ### 3.2 手机端模块
 
