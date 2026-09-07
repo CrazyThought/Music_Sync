@@ -46,6 +46,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 12),
           _buildScanSettingsSection(),
           const SizedBox(height: 12),
+          _buildDiffSettingsSection(),
+          const SizedBox(height: 12),
           _buildAppearanceSection(),
           const SizedBox(height: 12),
           _buildDebugSection(),
@@ -191,6 +193,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 );
               }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDiffSettingsSection() {
+    final config = ConfigService.instance.config;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.compare_arrows, size: 22),
+                SizedBox(width: 8),
+                Text('差异比较',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 12),
+            // 文件大小强制参与判定：全部字段均为常量，故整体 const。
+            const SwitchListTile(
+              title: Text('文件大小'),
+              subtitle: Text('始终参与判定，不可取消'),
+              // value 恒 true 且 onChanged 为 null：常驻开启，禁止取消。
+              value: true,
+              onChanged: null,
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+            ),
+            const SizedBox(height: 8),
+            SwitchListTile(
+              title: const Text('内容哈希'),
+              subtitle: const Text('需在扫描设置开启音乐哈希运算，且 PC/手机两侧签名均含哈希时才生效；任一侧缺值自动跳过该维度'),
+              // 以当前配置是否含 content_hash 决定开关状态。
+              value: config.diffJudgmentDims.contains(diffDimensionContentHash),
+              onChanged: (v) {
+                // 基于原列表增删该维度 id，避免影响其它已勾选维度。
+                final next = List<String>.from(config.diffJudgmentDims);
+                if (v) {
+                  next.add(diffDimensionContentHash);
+                } else {
+                  next.remove(diffDimensionContentHash);
+                }
+                ConfigService.instance.updateDiffJudgmentDims(next);
+                setState(() {});
+              },
+              contentPadding: EdgeInsets.zero,
+              dense: true,
             ),
           ],
         ),

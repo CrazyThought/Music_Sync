@@ -187,7 +187,8 @@ class ScanPage(ctk.CTkFrame):
 
             if previous:
                 try:
-                    self.diff_report = compare_signatures(result, previous)
+                    self.diff_report = compare_signatures(result, previous,
+                                                          judgment_dims=self.config.judgment_dims)
                 except (KeyError, TypeError, ValueError):
                     self.diff_report = None
 
@@ -279,7 +280,8 @@ class ScanPage(ctk.CTkFrame):
             # 如果已有当前扫描结果，立即执行差异比较
             if self.scan_result:
                 try:
-                    self.diff_report = compare_signatures(self.scan_result, imported)
+                    self.diff_report = compare_signatures(self.scan_result, imported,
+                                                          judgment_dims=self.config.judgment_dims)
                     if self.diff_report:
                         logger.info("导入后差异比较：新增=%d, 更新=%d, 删除=%d, 未变=%d",
                                    len(self.diff_report.added), len(self.diff_report.updated),

@@ -31,6 +31,9 @@ _DEFAULT_CONFIG: dict[str, Any] = {
         "theme": "dark",
         "language": "zh",
     },
+    "diff_settings": {
+        "judgment_dims": [],
+    },
     "last_scan": {},
 }
 
@@ -105,6 +108,16 @@ class ConfigManager:
     @extensions.setter
     def extensions(self, value: list[str]) -> None:
         self._data.setdefault("scan_settings", {})["extensions"] = value
+        self.save()
+
+    @property
+    def judgment_dims(self) -> list[str]:
+        """额外启用的差异判定维度 id（不含强制维度 file_size），缺省为空列表。"""
+        return list(self._data.get("diff_settings", {}).get("judgment_dims", []))
+
+    @judgment_dims.setter
+    def judgment_dims(self, value: list[str]) -> None:
+        self._data.setdefault("diff_settings", {})["judgment_dims"] = list(value)
         self.save()
 
     @property

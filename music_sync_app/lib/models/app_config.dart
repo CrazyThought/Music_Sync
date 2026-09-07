@@ -9,6 +9,8 @@ class AppConfig {
   int lastScanTimestamp;
   bool enableHashComputation;
   bool enableDebugLog;
+  // 用户额外勾选的可选判定维度 id 列表（不含强制维度 file_size），默认 []。
+  List<String> diffJudgmentDims;
 
   AppConfig({
     this.musicFolderPath = '',
@@ -20,6 +22,7 @@ class AppConfig {
     this.lastScanTimestamp = 0,
     this.enableHashComputation = false,
     this.enableDebugLog = false,
+    this.diffJudgmentDims = const [],
   });
 
   factory AppConfig.fromJson(Map<String, dynamic> json) {
@@ -33,6 +36,9 @@ class AppConfig {
       lastScanTimestamp: json['lastScanTimestamp'] as int? ?? 0,
       enableHashComputation: json['enableHashComputation'] as bool? ?? false,
       enableDebugLog: json['enableDebugLog'] as bool? ?? false,
+      // 缺失字段回退为空列表，与默认行为一致。
+      diffJudgmentDims:
+          List<String>.from(json['diffJudgmentDims'] ?? const <String>[]),
     );
   }
 
@@ -46,5 +52,6 @@ class AppConfig {
         'lastScanTimestamp': lastScanTimestamp,
         'enableHashComputation': enableHashComputation,
         'enableDebugLog': enableDebugLog,
+        'diffJudgmentDims': diffJudgmentDims,
       };
 }

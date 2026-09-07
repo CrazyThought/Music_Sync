@@ -66,6 +66,16 @@ class ConfigService extends ChangeNotifier {
     _logSettingChange('哈希运算', '$old', '$enabled');
   }
 
+  /// 更新差异判定维度：记录用户勾选的可选判定维度 id 集合（不含强制维度 file_size）。
+  ///
+  /// [dims] 新的可选判定维度 id 列表，内部做拷贝以避免外部修改污染配置。
+  void updateDiffJudgmentDims(List<String> dims) {
+    final old = _config.diffJudgmentDims.join(',');
+    _config.diffJudgmentDims = List.of(dims);
+    save();
+    _logSettingChange('差异判定维度', old, dims.join(','));
+  }
+
   void updateDebugLog(bool enabled) {
     final old = _config.enableDebugLog;
     _config.enableDebugLog = enabled;

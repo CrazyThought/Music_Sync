@@ -7,6 +7,7 @@ from typing import Any
 import customtkinter as ctk
 
 from core.config import ConfigManager
+from utils.constants import DIFF_DIM_CONTENT_HASH
 
 
 class SettingsPage(ctk.CTkFrame):
@@ -54,8 +55,38 @@ class SettingsPage(ctk.CTkFrame):
                       command=self._save_settings).grid(
             row=4, column=0, columnspan=2, padx=15, pady=15)
 
+        # ---- 差异比较设置区：file_size 强制参与；可选维度由 config.judgment_dims 决定 ----
+        diff_frame = ctk.CTkFrame(self)
+        diff_frame.grid(row=1, column=0, padx=15, pady=5, sticky="ew")
+
+        ctk.CTkLabel(diff_frame, text="差异比较",
+                     font=ctk.CTkFont(size=15, weight="bold")).grid(
+            row=0, column=0, columnspan=2, padx=15, pady=(15, 10), sticky="w")
+
+        # file_size 为强制基准维度：常驻开启、禁用不可取消，保证判定永不因维度集合为空失效
+        self._file_size_check = ctk.CTkCheckBox(
+            diff_frame, text="文件大小（始终参与）", state="disabled")
+        self._file_size_check.select()
+        self._file_size_check.grid(row=1, column=0, columnspan=2,
+                                   padx=15, pady=5, sticky="w")
+
+        # content_hash 为可选判定维度：勾选态由 config.judgment_dims 决定，
+        # 勾选/取消即时写回配置并持久化
+        self._content_hash_check = ctk.CTkCheckBox(
+            diff_frame, text="内容哈希", command=self._on_content_hash_toggled)
+        if DIFF_DIM_CONTENT_HASH in self.config.judgment_dims:
+            self._content_hash_check.select()
+        self._content_hash_check.grid(row=2, column=0, columnspan=2,
+                                      padx=15, pady=5, sticky="w")
+
+        ctk.CTkLabel(
+            diff_frame,
+            text="提示：哈希维度需两侧签名均含内容哈希才生效，任一侧缺值自动跳过该维度",
+            font=ctk.CTkFont(size=11),
+        ).grid(row=3, column=0, columnspan=2, padx=15, pady=(0, 15), sticky="w")
+
         appearance_frame = ctk.CTkFrame(self)
-        appearance_frame.grid(row=1, column=0, padx=15, pady=5, sticky="ew")
+        appearance_frame.grid(row=2, column=0, padx=15, pady=5, sticky="ew")
 
         ctk.CTkLabel(appearance_frame, text="外观",
                      font=ctk.CTkFont(size=15, weight="bold")).grid(
@@ -72,7 +103,7 @@ class SettingsPage(ctk.CTkFrame):
             row=1, column=1, padx=5, pady=5, sticky="w")
 
         info_frame = ctk.CTkFrame(self)
-        info_frame.grid(row=2, column=0, padx=15, pady=15, sticky="ew")
+        info_frame.grid(row=3, column=0, padx=15, pady=15, sticky="ew")
 
         ctk.CTkLabel(info_frame, text="关于 MusicSync",
                      font=ctk.CTkFont(size=15, weight="bold")).grid(
@@ -105,6 +136,22 @@ class SettingsPage(ctk.CTkFrame):
         ctk.set_appearance_mode(value)
         if self._theme_callback:
             self._theme_callback(value)
+
+    def _on_content_hash_toggled(self) -> None:
+        """内容哈希判定维度勾选回调：将勾选态同步到 config.judgment_dims 并持久化。
+
+        content_hash 是当前唯一可选的判定维度，采用通用增删语义：
+        勾选则追加到列表尾部，取消则移除；移除后为空时写回 []，
+        保证配置始终反映用户实际勾选的可选维度（不含强制维度 file_size）。
+        """
+        dims = self.config.judgment_dims
+        if self._content_hash_check.get():
+            if DIFF_DIM_CONTENT_HASH not in dims:
+                dims.append(DIFF_DIM_CONTENT_HASH)
+        elif DIFF_DIM_CONTENT_HASH in dims:
+            dims.remove(DIFF_DIM_CONTENT_HASH)
+        # setter 内部会立即 save，空列表同样落盘，避免残留旧配置
+        self.config.judgment_dims = dims
 
     def _save_settings(self) -> None:
         try:
