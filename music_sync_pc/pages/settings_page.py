@@ -156,7 +156,7 @@ class SettingsPage(ctk.CTkFrame):
         ctk.CTkLabel(info_frame, text="关于 MusicSync",
                      font=ctk.CTkFont(size=15, weight="bold")).grid(
             row=0, column=0, padx=15, pady=(15, 5), sticky="w")
-        ctk.CTkLabel(info_frame, text="版本: 1.0.0",
+        ctk.CTkLabel(info_frame, text="版本: 1.1.1",
                      font=ctk.CTkFont(size=13)).grid(
             row=1, column=0, padx=15, pady=2, sticky="w")
         ctk.CTkLabel(info_frame, text="签名格式: 2.0 | 哈希: xxh64",
