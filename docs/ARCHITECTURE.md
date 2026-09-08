@@ -68,6 +68,7 @@ MusicSync 是一个本地音乐库同步工具，帮助用户在电脑和手机�
 | 应用配置 | `lib/app.dart` | MaterialApp、路由、主题 |
 | 数据模型 | `lib/models/` | 签名、文件条目、比较报告、配置 |
 | 扫描服务 | `lib/services/scanner_service.dart` | 手机端文件夹扫描、统计音频总数与逐文件进度上报 |
+| 音频元数据服务 | `lib/services/audio_metadata_service.dart` | 封装 Android `MediaMetadataRetriever`（经 `MainActivity` MethodChannel）按文件读取标题/艺术家/专辑/时长/比特率，映射为与 PC 端对齐的 `AudioMeta`（无标签/不支持格式时回退文件名） |
 | 签名服务 | `lib/services/signature_service.dart` | 签名文件读写 |
 | 差异服务 | `lib/services/diff_service.dart` | 三方差异比较 |
 | 导入服务 | `lib/services/import_service.dart` | PC 签名文件导入 |
