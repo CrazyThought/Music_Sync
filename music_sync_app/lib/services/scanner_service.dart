@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import '../models/file_entry.dart';
 import '../models/signature.dart';
 import '../utils/constants.dart';
+import 'audio_metadata_service.dart';
 import 'debug_log_service.dart';
 import 'hash_utils.dart';
 
@@ -125,6 +126,9 @@ class ScannerService {
             .replaceFirst('${root.path}${Platform.pathSeparator}', '')
             .replaceAll('\\', '/');
 
+        final audioMeta =
+            await _readAudioMeta(entity.path, relativePath, ext);
+
         result.add(FileEntry(
           relativePath: relativePath,
           fileSize: stat.size,
@@ -133,11 +137,7 @@ class ScannerService {
               ? await _computeHash(entity.path, stat.size)
               : '',
           contentHashAlgo: computeHash ? 'xxh3_64' : 'none',
-          audioMeta: const AudioMeta(
-            title: '',
-            artist: '',
-            durationMs: 0,
-          ),
+          audioMeta: audioMeta,
         ));
 
         // 每处理完一个音频文件上报一次进度，result.length 即全局已完成数
@@ -164,6 +164,25 @@ class ScannerService {
       if (audioExtensions.contains(ext)) count++;
     }
     return count;
+  }
+
+  /// 读取单个音频文件的元数据并构造 [AudioMeta]。
+  ///
+  /// [ext] 为小写扩展名。Android 框架（MediaMetadataRetriever）不支持的
+  /// 格式（wma/ape/wv）跳过原生调用；提取异常统一走空元数据兜底，不中断扫描。
+  Future<AudioMeta> _readAudioMeta(
+    String absolutePath,
+    String relativePath,
+    String ext,
+  ) async {
+    try {
+      final raw = unsupportedAudioExtensions.contains(ext)
+          ? null
+          : await AudioMetadataService.extract(absolutePath);
+      return buildPhoneAudioMeta(relativePath: relativePath, raw: raw);
+    } catch (_) {
+      return buildPhoneAudioMeta(relativePath: relativePath, raw: null);
+    }
   }
 
   Future<String> _computeHash(String filePath, int fileSize) async {

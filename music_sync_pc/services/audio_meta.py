@@ -89,7 +89,10 @@ def _from_generic(audio: Any, file_path: Path) -> dict[str, Any]:
 
 def _safe_tag(tags: dict, key: str, default: Any) -> Any:
     try:
-        return str(tags.get(key, default))
+        value = tags.get(key, default)
+        # 默认值为 None 表示"标签缺失"，直接返回 None，
+        # 避免被 str() 转换成字符串 "None"（spec 要求 album 无标签时为 null）
+        return None if value is None else str(value)
     except Exception:
         return default
 
