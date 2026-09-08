@@ -249,6 +249,13 @@ flutter build ios --release
 flutter create . --platforms windows
 ```
 
+### 全量构建
+
+```powershell
+# 全量构建(PC+Android)
+.\scripts\build_release.ps1
+```
+
 ### 项目清理
 
 ```powershell

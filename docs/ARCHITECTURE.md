@@ -82,6 +82,12 @@ MusicSync 是一个本地音乐库同步工具，帮助用户在电脑和手机�
 | 设置页 | `lib/screens/settings_screen.dart` | 路径配置、扫描参数、调试开关 |
 | 日志弹窗 | `lib/widgets/debug_log_dialog.dart` | 日志展示、虚拟列表分页、实时刷新、导出、清空 |
 
+### 3.3 构建/发布脚本
+
+| 脚本 | 路径 | 用途 |
+|------|------|------|
+| 一键发布脚本 | `scripts/build_release.ps1` | 读取 App 与 PC 当前版本 → 交互输入新版本名(x.y.z，App 构建号自动+1，PC 保持 x.y.z) → 前置校验 flutter 与 PyInstaller → 同步更新两端版本文件（App：`pubspec.yaml`、`settings_screen.dart`；PC：`constants.py`、`settings_page.py`）→ 依次执行 `flutter build apk --release` 与 `pyinstaller build.spec` → 统一归档 `MusicSync-Vxx.xx.xx.apk/.exe` 到项目根 `dist/`。版本来源：App 为 `pubspec.yaml` 的 `version` 字段（含构建号），PC 为 `constants.py` 的 `APP_VERSION`（仅 x.y.z）。 |
+
 ## 4. 数据流
 
 ```
