@@ -75,6 +75,15 @@ class App(ctk.CTk):
         if self.config.debug_log_enabled:
             self._show_debug_log_tab()
 
+        # 主窗口关闭时释放配对服务端口，避免端口泄露
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    def _on_close(self) -> None:
+        """主窗口关闭回调：先释放扫描页内的配对服务，再销毁窗口退出。"""
+        if hasattr(self, "scan_page"):
+            self.scan_page.on_close()
+        self.destroy()
+
     def _on_tab_changed(self) -> None:
         tab = self._tabview.get()
         if tab == "扫描":
@@ -125,6 +134,13 @@ class App(ctk.CTk):
         if self._tabview.get() == "调试日志":
             self._tabview.set("扫描")
         self._tabview.delete("调试日志")
+        # 修复 customtkinter: CTkSegmentedButton.delete 后残留空列 weight 未清零，
+        # 导致删除 tab 后顶部分段栏宽度不回缩。遍历无 widget 的列并清零其 weight。
+        _seg = self._tabview._segmented_button
+        _cols, _ = _seg.grid_size()
+        for _col in range(_cols):
+            if not _seg.grid_slaves(row=0, column=_col):
+                _seg.grid_columnconfigure(_col, weight=0, minsize=0)
         self.debug_log_page = None
         self._debug_log_tab_active = False
 

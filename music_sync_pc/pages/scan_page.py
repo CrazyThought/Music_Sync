@@ -11,6 +11,7 @@ from typing import Any
 import customtkinter as ctk
 
 from core.config import ConfigManager
+from pages.pairing_page import PairingCard
 from services.scanner import MusicScanner
 from services.signature import save_signature, load_signature
 from services.diff_service import compare_signatures, DiffReport
@@ -106,6 +107,10 @@ class ScanPage(ctk.CTkFrame):
         self._import_btn = ctk.CTkButton(export_frame, text="导入特征文件",
                                          height=36, command=self._import_signature)
         self._import_btn.grid(row=0, column=1, padx=(5, 10), pady=10, sticky="ew")
+
+        # 局域网连接卡片：占据扫描页下方一行，集成二维码配对连接入口
+        self.pairing_card = PairingCard(self, self.config)
+        self.pairing_card.grid(row=4, column=0, padx=15, pady=(5, 15), sticky="ew")
 
     def _choose_music_folder(self) -> None:
         folder = filedialog.askdirectory(title="选择音乐文件夹")
@@ -303,3 +308,8 @@ class ScanPage(ctk.CTkFrame):
 
     def on_tab_activated(self) -> None:
         self._refresh_state()
+
+    def on_close(self) -> None:
+        """页面销毁前释放局域网连接服务（停止配对并释放端口）。"""
+        if hasattr(self, "pairing_card"):
+            self.pairing_card.on_close()

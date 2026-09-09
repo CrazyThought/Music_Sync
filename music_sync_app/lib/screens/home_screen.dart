@@ -10,6 +10,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/signature.dart';
 import '../models/sync_report.dart';
 import '../services/config_service.dart';
+import '../services/connection_service.dart';
 import '../services/debug_log_service.dart';
 import '../services/scanner_service.dart';
 import '../services/diff_service.dart';
@@ -47,6 +48,11 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () => showDebugLogDialog(context),
             ),
           IconButton(
+            icon: const Icon(Icons.qr_code_scanner),
+            tooltip: '扫码连接 PC',
+            onPressed: () => Navigator.pushNamed(context, '/qr-scan'),
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () =>
                 Navigator.pushNamed(context, '/settings').then((_) => setState(() {})),
@@ -77,6 +83,8 @@ class _HomeScreenState extends State<HomeScreen> {
             signature: _pcSignature,
             onImport: _importPcSignature,
           ),
+          const SizedBox(height: 12),
+          _buildConnectionCard(),
           const SizedBox(height: 12),
           _buildSyncStatusCard(),
         ],
@@ -198,6 +206,70 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildConnectionCard() {
+    return ListenableBuilder(
+      listenable: ConnectionService.instance,
+      builder: (context, child) {
+        final connectionService = ConnectionService.instance;
+        if (connectionService.isConnected) {
+          final peer = connectionService.peer!;
+          return Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.sync, color: Colors.green, size: 28),
+                      SizedBox(width: 8),
+                      Text('已连接 PC',
+                          style: TextStyle(
+                              fontSize: 18, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text('设备名: ${peer.name}'),
+                  Text('版本: ${peer.version}'),
+                  const SizedBox(height: 12),
+                  OutlinedButton(
+                    onPressed: () {
+                      connectionService.disconnect();
+                      DebugLogService.instance.operation('已断开与 PC 的连接');
+                    },
+                    child: const Text('断开连接'),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return const Card(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.sync_disabled, color: Colors.grey, size: 28),
+                    SizedBox(width: 8),
+                    Text('未连接',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Text('点击右上角扫码图标连接 PC',
+                    style: TextStyle(color: Colors.grey)),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

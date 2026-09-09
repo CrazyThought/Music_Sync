@@ -22,6 +22,10 @@ DEFAULT_LOG_DIR: Path = Path("./logs")
 CONFIG_FILE_NAME: str = "config.json"
 SIGNATURE_FILE_NAME: str = "pc_signature.json"
 
+# 局域网配对默认监听端口与传输协议版本（与手机端对齐）
+DEFAULT_PAIRING_PORT: int = 45872
+TRANSPORT_PROTOCOL_VERSION: int = 1
+
 # 差异判定维度 id（与手机端 constants.dart 保持一致，供配置与 diff 结果内部使用）
 DIFF_DIM_CONTENT_HASH = "content_hash"  # 内容哈希：可选维度，双侧签名均含有效哈希才参与该文件对判定
 DIFF_DIM_FILE_SIZE = "file_size"  # 文件大小：强制参与判定的基准维度，不可取消
