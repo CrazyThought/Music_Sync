@@ -1,4 +1,11 @@
 /// 常量定义。
+
+/// 应用版本号（与 pubspec 版本对齐），用于双端握手交换。
+const appVersion = '1.1.1';
+
+/// 传输协议版本（与 PC 端 TRANSPORT_PROTOCOL_VERSION 对齐）。
+const transportProtocolVersion = 1;
+
 const audioExtensions = {
   'mp3', 'flac', 'wav', 'm4a', 'ogg',
   'wma', 'aac', 'opus', 'ape', 'wv',

@@ -14,6 +14,7 @@ from utils.constants import (
     CONFIG_FILE_NAME,
     DEFAULT_MAX_WORKERS,
     DEFAULT_OUTPUT_DIR,
+    DEFAULT_PAIRING_PORT,
     LARGE_FILE_THRESHOLD_BYTES,
     CHUNK_HASH_SIZE_BYTES,
 )
@@ -35,6 +36,9 @@ _DEFAULT_CONFIG: dict[str, Any] = {
     "appearance": {
         "theme": "dark",
         "language": "zh",
+    },
+    "network_settings": {
+        "pairing_port": DEFAULT_PAIRING_PORT,
     },
     "diff_settings": {
         "judgment_dims": [],
@@ -113,6 +117,20 @@ class ConfigManager:
     @extensions.setter
     def extensions(self, value: list[str]) -> None:
         self._data.setdefault("scan_settings", {})["extensions"] = value
+        self.save()
+
+    @property
+    def pairing_port(self) -> int:
+        """局域网配对监听端口，缺省回退 DEFAULT_PAIRING_PORT。"""
+        value = self._data.get("network_settings", {}).get("pairing_port", DEFAULT_PAIRING_PORT)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return DEFAULT_PAIRING_PORT
+
+    @pairing_port.setter
+    def pairing_port(self, value: int) -> None:
+        self._data.setdefault("network_settings", {})["pairing_port"] = int(value)
         self.save()
 
     @property
