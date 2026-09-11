@@ -44,7 +44,7 @@ exe = EXE(
     a.datas,
     [],
     name='MusicSync',
-    icon=None,
+    icon='icon.ico',
     console=False,
     onefile=True,
 )

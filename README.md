@@ -249,12 +249,17 @@ flutter build ios --release
 flutter create . --platforms windows
 ```
 
-### 全量构建
+### 发布构建
 
 ```powershell
-# 全量构建(PC+Android)
+# 交互式选择构建范围：
+#   1) 全量构建：Android APK + PC exe，需要输入新版本号(x.y.z)
+#   2) 仅 App 构建：只出 APK，沿用当前版本号
+#   3) 仅 PC 构建：只出 exe，沿用当前版本号
 .\scripts\build_release.ps1
 ```
+
+仅「全量构建」会输入新版本号并同步更新两端版本文件；「仅 App」「仅 PC」不修改任何版本文件，产物按当前版本号归档到 `dist/`（同名产物会被覆盖）。
 
 ### 项目清理
 
