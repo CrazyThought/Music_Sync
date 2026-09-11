@@ -12,6 +12,7 @@ from utils.constants import (
     APP_NAME,
     APP_VERSION,
     CONFIG_FILE_NAME,
+    DEFAULT_GRPC_PORT,
     DEFAULT_MAX_WORKERS,
     DEFAULT_OUTPUT_DIR,
     DEFAULT_PAIRING_PORT,
@@ -39,6 +40,7 @@ _DEFAULT_CONFIG: dict[str, Any] = {
     },
     "network_settings": {
         "pairing_port": DEFAULT_PAIRING_PORT,
+        "grpc_port": DEFAULT_GRPC_PORT,
     },
     "diff_settings": {
         "judgment_dims": [],
@@ -131,6 +133,20 @@ class ConfigManager:
     @pairing_port.setter
     def pairing_port(self, value: int) -> None:
         self._data.setdefault("network_settings", {})["pairing_port"] = int(value)
+        self.save()
+
+    @property
+    def grpc_port(self) -> int:
+        """gRPC 数据传输服务监听端口，缺省回退 DEFAULT_GRPC_PORT。"""
+        value = self._data.get("network_settings", {}).get("grpc_port", DEFAULT_GRPC_PORT)
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return DEFAULT_GRPC_PORT
+
+    @grpc_port.setter
+    def grpc_port(self, value: int) -> None:
+        self._data.setdefault("network_settings", {})["grpc_port"] = int(value)
         self.save()
 
     @property

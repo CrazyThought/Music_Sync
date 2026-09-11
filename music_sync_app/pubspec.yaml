@@ -1,4 +1,4 @@
-name: music_sync_app
+﻿name: music_sync_app
 description: MusicSync 手机端 - 本地音乐特征扫描与差异比较
 publish_to: "none"
 version: 1.1.1+2
@@ -18,6 +18,9 @@ dependencies:
   path: ^1.9.0
   xxh3: ^1.1.0
   mobile_scanner: ^7.4.0
+  grpc: ^4.0.0
+  protobuf: ^4.0.0
+  fixnum: ^1.1.0
 
 dev_dependencies:
   flutter_test:

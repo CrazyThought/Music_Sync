@@ -3,6 +3,9 @@
 提供 ``PairingCard``：在扫描页下方以卡片形式展示连接状态，点击「二维码连接」
 启动配对服务并弹出 ``PairingQrDialog`` 展示二维码；握手成功后弹窗自动关闭，
 卡片展示对端设备信息，并提供「断开连接」按钮释放服务端口。
+
+卡片同时管理数据面（gRPC 数据传输服务）的生命周期：与配对会话同启同停，
+并在已连接时轮询展示「当前传输文件 + 进度」。
 """
 
 from __future__ import annotations
@@ -14,8 +17,10 @@ from typing import Any, Callable
 import customtkinter as ctk
 
 from core.config import ConfigManager
+from services.grpc_transport import GrpcSyncServer, TransferSnapshot
 from services.qr_pairing import QrPairingTransport, render_qr_image
 from services.sync_transport import PairingCode
+from utils.file_utils import format_size
 
 logger = logging.getLogger("musicsync")
 
@@ -24,9 +29,13 @@ _STATUS_WAITING = "等待手机扫码..."
 _STATUS_PAIRED = "已连接"
 _STATUS_ERROR = "连接失败"
 _STATUS_LOST = "连接已断开"
+_STATUS_TRANSFER_IDLE = "暂无传输任务"
 
 # 健康轮询间隔（毫秒）：配对成功后定时检查对端心跳是否超时
 _POLL_INTERVAL_MS = 3000
+
+# 传输进度轮询间隔（毫秒）：传输过程较短，取更小间隔以获得顺滑的进度反馈
+_PROGRESS_POLL_INTERVAL_MS = 800
 
 
 class PairingCard(ctk.CTkFrame):
@@ -39,6 +48,7 @@ class PairingCard(ctk.CTkFrame):
     Attributes:
         config: 应用配置管理器。
         _transport: 二维码配对传输实例（None 表示未创建/已释放）。
+        _grpc_server: gRPC 数据传输服务实例（None 表示未创建/已释放）。
         _dialog: 当前打开的二维码弹窗引用（None 表示未弹出）。
     """
 
@@ -46,12 +56,14 @@ class PairingCard(ctk.CTkFrame):
         super().__init__(master, **kwargs)
         self.config = config
         self._transport: QrPairingTransport | None = None
+        self._grpc_server: GrpcSyncServer | None = None
         self._dialog: PairingQrDialog | None = None
         self._health_after_id: str | None = None
+        self._progress_after_id: str | None = None
         self._build_ui()
 
     def _build_ui(self) -> None:
-        """构建卡片：标题、状态行、连接/断开按钮。"""
+        """构建卡片：标题、状态行、传输进度行、连接/断开按钮。"""
         self.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
@@ -68,8 +80,18 @@ class PairingCard(ctk.CTkFrame):
         )
         self._status_label.grid(row=1, column=0, padx=15, pady=(0, 4), sticky="w")
 
+        # 传输进度行：展示数据面当前正在读写的文件与进度，无任务时展示占位文案
+        self._transfer_label = ctk.CTkLabel(
+            self,
+            text=_STATUS_TRANSFER_IDLE,
+            font=ctk.CTkFont(size=12),
+            anchor="w",
+            justify="left",
+        )
+        self._transfer_label.grid(row=2, column=0, padx=15, pady=(0, 4), sticky="w")
+
         btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        btn_frame.grid(row=2, column=0, padx=15, pady=(0, 12), sticky="ew")
+        btn_frame.grid(row=3, column=0, padx=15, pady=(0, 12), sticky="ew")
         btn_frame.grid_columnconfigure(0, weight=1)
         btn_frame.grid_columnconfigure(1, weight=1)
 
@@ -88,11 +110,13 @@ class PairingCard(ctk.CTkFrame):
     # 事件回调
     # ------------------------------------------------------------------
     def _on_connect_clicked(self) -> None:
-        """启动配对服务并弹出二维码弹窗，等待手机扫码。"""
+        """启动配对服务与数据面服务，并弹出二维码弹窗等待手机扫码。"""
         try:
             transport = QrPairingTransport()
             transport.start("0.0.0.0", self.config.pairing_port)
             self._transport = transport
+            # 数据面与配对会话同生命周期启动；失败不阻断配对（降级为不可传输）
+            self._start_grpc_server(transport)
             pairing = transport.create_pairing()
 
             self._status_label.configure(text=_STATUS_WAITING)
@@ -116,8 +140,27 @@ class PairingCard(ctk.CTkFrame):
             self._status_label.configure(text=f"{_STATUS_ERROR}: {exc}")
             self._stop_transport()
 
+    def _start_grpc_server(self, transport: QrPairingTransport) -> None:
+        """启动 gRPC 数据传输服务并把实际端口登记到配对传输实例。
+
+        端口登记后随握手响应回传手机端，供其建立数据面通道。启动失败时仅
+        记录告警并保持 grpc_port=0，不影响控制面的配对与心跳。
+
+        Args:
+            transport: 已启动的配对传输实例，用于提供对端 peer_id 供鉴权。
+        """
+        server = GrpcSyncServer(self.config, transport.get_peer_id)
+        try:
+            port = server.start("0.0.0.0", self.config.grpc_port)
+            self._grpc_server = server
+            transport.set_grpc_port(port)
+        except OSError:
+            logger.exception("gRPC 数据传输服务启动失败，本次会话仅支持配对不含传输")
+            server.stop()
+            transport.set_grpc_port(0)
+
     def _on_paired(self) -> None:
-        """握手成功的回调：更新状态行展示对端设备信息并启动健康轮询。"""
+        """握手成功的回调：更新状态行展示对端设备信息并启动轮询。"""
         self._dialog = None
         peer = self._transport.get_peer_info() if self._transport is not None else None
         if peer is not None:
@@ -129,14 +172,17 @@ class PairingCard(ctk.CTkFrame):
         self._connect_btn.configure(state="disabled")
         self._disconnect_btn.configure(state="normal")
         self._start_health_poll()
+        self._start_progress_poll()
         logger.info("配对成功，卡片已展示对端信息")
 
     def _on_dialog_cancelled(self) -> None:
         """用户手动关闭弹窗的回调：复位卡片状态并释放服务。"""
         self._dialog = None
         self._stop_health_poll()
+        self._stop_progress_poll()
         self._stop_transport()
         self._status_label.configure(text=_STATUS_IDLE)
+        self._transfer_label.configure(text=_STATUS_TRANSFER_IDLE)
         self._connect_btn.configure(state="normal")
         self._disconnect_btn.configure(state="disabled")
 
@@ -144,13 +190,15 @@ class PairingCard(ctk.CTkFrame):
         """停止配对服务并复位卡片状态（若弹窗仍打开则一并关闭）。"""
         self._close_dialog()
         self._stop_health_poll()
+        self._stop_progress_poll()
         self._stop_transport()
         self._status_label.configure(text=_STATUS_IDLE)
+        self._transfer_label.configure(text=_STATUS_TRANSFER_IDLE)
         self._connect_btn.configure(state="normal")
         self._disconnect_btn.configure(state="disabled")
 
     def _stop_transport(self) -> None:
-        """安全停止并释放传输实例。"""
+        """安全停止并释放配对传输与 gRPC 数据面实例。"""
         transport = self._transport
         if transport is not None:
             try:
@@ -158,6 +206,13 @@ class PairingCard(ctk.CTkFrame):
             except Exception:
                 logger.exception("配对服务停止异常")
             self._transport = None
+        server = self._grpc_server
+        if server is not None:
+            try:
+                server.stop()
+            except Exception:
+                logger.exception("gRPC 数据传输服务停止异常")
+            self._grpc_server = None
 
     def _close_dialog(self) -> None:
         """关闭尚未销毁的二维码弹窗（不触发取消回调）。"""
@@ -194,18 +249,67 @@ class PairingCard(ctk.CTkFrame):
 
     def _on_connection_lost(self) -> None:
         """对端掉线后的复位：停止服务、更新状态行并恢复按钮。"""
+        self._stop_progress_poll()
         self._stop_transport()
         self._status_label.configure(text=_STATUS_LOST)
+        self._transfer_label.configure(text=_STATUS_TRANSFER_IDLE)
         self._connect_btn.configure(state="normal")
         self._disconnect_btn.configure(state="disabled")
+
+    # ------------------------------------------------------------------
+    # 传输进度轮询：读取 gRPC 服务记录的进度快照，展示当前传输文件与进度
+    # ------------------------------------------------------------------
+    def _start_progress_poll(self) -> None:
+        """启动（或重置）一次传输进度刷新的延时调度。"""
+        self._stop_progress_poll()
+        self._progress_after_id = self.after(
+            _PROGRESS_POLL_INTERVAL_MS, self._poll_transfer_progress
+        )
+
+    def _stop_progress_poll(self) -> None:
+        """取消尚未触发的传输进度调度。"""
+        if self._progress_after_id is not None:
+            self.after_cancel(self._progress_after_id)
+            self._progress_after_id = None
+
+    def _poll_transfer_progress(self) -> None:
+        """刷新传输进度文案；传输结束后回到占位文案，并继续轮询。"""
+        self._progress_after_id = None
+        server = self._grpc_server
+        if server is None:
+            return
+        self._transfer_label.configure(text=self._format_transfer_text(server.progress.snapshot()))
+        self._start_progress_poll()
+
+    @staticmethod
+    def _format_transfer_text(snapshot: TransferSnapshot) -> str:
+        """把进度快照格式化为卡片上的一行文案。
+
+        Args:
+            snapshot: gRPC 服务当前记录的进度快照。
+
+        Returns:
+            形如「上传中 40% · a.mp3（4.0 MB / 10.0 MB）」的可读文案；
+            无传输时返回占位文案。
+        """
+        if not snapshot.active:
+            return _STATUS_TRANSFER_IDLE
+        action = "上传中" if snapshot.direction == "upload" else "下发中"
+        name = snapshot.relative_path.rsplit("/", 1)[-1]
+        if snapshot.total_bytes > 0:
+            percent = int(snapshot.transferred_bytes * 100 / snapshot.total_bytes)
+            size_text = f"{format_size(snapshot.transferred_bytes)} / {format_size(snapshot.total_bytes)}"
+            return f"{action} {percent}% · {name}（{size_text}）"
+        return f"{action} · {name}（{format_size(snapshot.transferred_bytes)}）"
 
     # ------------------------------------------------------------------
     # 公开接口
     # ------------------------------------------------------------------
     def on_close(self) -> None:
-        """卡片销毁前停止服务与健康轮询，释放端口与线程。"""
+        """卡片销毁前停止服务、健康轮询与进度轮询，释放端口与线程。"""
         self._close_dialog()
         self._stop_health_poll()
+        self._stop_progress_poll()
         self._stop_transport()
 
 

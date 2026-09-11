@@ -7,6 +7,7 @@ import 'screens/import_screen.dart';
 import 'screens/diff_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/qr_scan_screen.dart';
+import 'screens/sync_screen.dart';
 
 class MusicSyncApp extends StatelessWidget {
   const MusicSyncApp({super.key});
@@ -35,6 +36,7 @@ class MusicSyncApp extends StatelessWidget {
         '/diff': (_) => const DiffScreen(),
         '/settings': (_) => const SettingsScreen(),
         '/qr-scan': (_) => const QrScanScreen(),
+        '/sync': (_) => const SyncScreen(),
       },
     );
   }

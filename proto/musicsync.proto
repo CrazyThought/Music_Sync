@@ -1,0 +1,69 @@
+// MusicSync 双端数据传输契约 —— gRPC 服务定义。
+//
+// 控制面（发现 / 配对 / 握手 / 心跳）由现有 HTTP 通道承载；
+// 本文件只描述数据面（签名拉取 + 文件双向传输）。
+// 两端均由此文件生成代码，任何字段变更都需重新生成（见 scripts/generate_proto.ps1）。
+//
+// 鉴权约定：所有 RPC 通过 gRPC metadata 携带 `peer-id`，服务端校验其是否为
+// 当前已配对会话的对端；未通过返回 UNAUTHENTICATED。
+syntax = "proto3";
+
+package musicsync;
+
+option java_package = "com.example.music_sync_app.generated";
+option java_multiple_files = true;
+
+// 拉取签名请求（鉴权信息在 metadata 中，此处无业务参数）。
+message GetSignatureRequest {}
+
+// 特征签名响应。
+//
+// 签名体遵循 SIGNATURE_SPEC v2.0 的 JSON 结构，这里以 UTF-8 字节整体承载，
+// 而不在 proto 中重复定义整套文件条目 schema：
+// 一方面保持 `docs/SIGNATURE_SPEC.md` 为唯一事实来源，避免两份定义漂移；
+// 另一方面两端可直接复用既有的签名序列化/反序列化与版本校验实现。
+message SignatureResponse {
+  bytes json = 1; // SIGNATURE_SPEC v2.0 的完整 JSON（UTF-8 编码，无 BOM）
+}
+
+// 下载请求。
+message DownloadRequest {
+  string relative_path = 1; // 待下载文件的相对路径
+  int64 offset = 2;         // 起始偏移（字节）；断点续传时传入已下载字节数
+}
+
+// 文件数据块（下载 server-streaming / 上传 client-streaming 共用）。
+message FileChunk {
+  string relative_path = 1; // 相对路径（上传首块必填，供服务端定位写入目标）
+  int64 offset = 2;         // 本块数据在文件中的起始偏移
+  bytes data = 3;           // 数据内容
+  int64 total_size = 4;     // 文件总大小（字节）
+}
+
+// 上传响应。
+message UploadResponse {
+  string relative_path = 1; // 本次上传的相对路径
+  int64 received_bytes = 2; // 服务端已接收的总字节数（用于续传判断）
+  bool completed = 3;       // 是否已完成（已接收字节覆盖总大小且落盘长度一致）
+  string content_hash = 4;  // 完成后服务端重算的内容哈希（供客户端校验）
+}
+
+// 上传状态查询请求：用于上传中断后的断点续传。
+message UploadStatusRequest {
+  string relative_path = 1; // 待查询的相对路径
+}
+
+// 数据传输服务：签名拉取 + 文件双向传输。
+service MusicSync {
+  // 拉取 PC 端最新特征签名。
+  rpc GetSignature(GetSignatureRequest) returns (SignatureResponse);
+
+  // 下载文件：服务端从 offset 起分块下发，实现断点续传。
+  rpc DownloadFile(DownloadRequest) returns (stream FileChunk);
+
+  // 上传文件：客户端逐块上传，服务端按 offset 续接写入。
+  rpc UploadFile(stream FileChunk) returns (UploadResponse);
+
+  // 查询某文件在服务端已接收的字节数，供上传断点续传定位偏移。
+  rpc GetUploadStatus(UploadStatusRequest) returns (UploadResponse);
+}

@@ -27,6 +27,8 @@ class ScanPage(ctk.CTkFrame):
         self.scan_result: dict[str, Any] | None = None
         self.diff_report: DiffReport | None = None
         self._scanning = False
+        # 本次扫描结果是否已自动落盘为签名文件（供状态栏提示同步数据是否最新）
+        self._signature_saved = False
 
         self._build_ui()
         self._refresh_state()
@@ -204,6 +206,18 @@ class ScanPage(ctk.CTkFrame):
                 "signature_file": str(sig_path),
             }
 
+            # 扫描结果自动落盘：局域网同步的数据面（gRPC GetSignature）读取的就是该文件，
+            # 若只扫描不落盘，同步会继续下发上一次导出的旧签名，其 file_size / 路径可能已过期，
+            # 从而把两端其实一致的文件误判为「需上传 / 需下载」。
+            # 落盘失败不影响本次扫描（增量扫描与同步仍可用「导出签名文件」手动重试）。
+            self._signature_saved = False
+            try:
+                save_signature(result, sig_path)
+                self._signature_saved = True
+                logger.info("扫描结果已自动保存为签名文件: %s", sig_path)
+            except (OSError, ValueError) as e:
+                logger.warning("扫描结果自动保存失败（不影响本次扫描）: %s", e)
+
             self.after(0, self._on_scan_done)
         except (OSError, PermissionError, ValueError) as e:
             logger.exception("扫描失败")
@@ -224,6 +238,12 @@ class ScanPage(ctk.CTkFrame):
             msg = f"扫描完成：{total} 个文件，{format_size(total_size)}，耗时 {duration / 1000:.1f}s"
             if self.diff_report and self.diff_report.has_changes:
                 msg += f" | 变更 {self.diff_report.total_changes} 项"
+            # 明确告知签名是否已是最新：局域网同步的数据面直接使用该文件
+            msg += (
+                " | 签名已自动更新"
+                if self._signature_saved
+                else " | 签名保存失败，请点「导出签名文件」重试"
+            )
             self._status_label.configure(text=msg)
         else:
             self._status_label.configure(text="扫描完成，未生成结果")
