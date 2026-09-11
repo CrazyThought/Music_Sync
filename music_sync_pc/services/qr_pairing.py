@@ -32,6 +32,10 @@ logger = logging.getLogger("musicsync")
 # token 有效期（秒）：超过后即便未被消费也视为过期，需重新生成二维码
 _TOKEN_TTL_SECONDS: float = 180.0
 
+# 心跳超时（秒）：配对成功后若连续该时长内未收到手机心跳，则判定手机已断开。
+# 允许连续丢失约 3 个 3 秒间隔的心跳，避免瞬时网络抖动误判。
+_HEARTBEAT_TIMEOUT_SECONDS: float = 9.0
+
 
 def render_qr_image(text: str, box_size: int = 10, border: int = 4) -> Any:
     """将文本编码为二维码并渲染成 PIL 图像对象。
@@ -110,6 +114,7 @@ class QrPairingTransport(SyncTransport):
         self._thread: threading.Thread | None = None
         self._peer_id: str = secrets.token_hex(8)
         self._peer_info: DeviceInfo | None = None
+        self._last_seen_at: float = 0.0
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------
@@ -145,6 +150,7 @@ class QrPairingTransport(SyncTransport):
             self._paired = False
             self._token = None
             self._peer_info = None
+            self._last_seen_at = 0.0
         server = self._server
         if server is not None:
             server.shutdown()
@@ -172,6 +178,21 @@ class QrPairingTransport(SyncTransport):
         with self._lock:
             return self._peer_info
 
+    def is_peer_alive(self) -> bool:
+        """判断对端（手机）是否仍在正常维持心跳。
+
+        配对成功后由手机端定时发送心跳刷新 ``_last_seen_at``；若最近一次
+        心跳时间早于 ``_HEARTBEAT_TIMEOUT_SECONDS``，则视为对端已断开。
+        未配对时恒返回 ``False``。
+
+        Returns:
+            True 表示对端存活，False 表示未连接或已超时断开。
+        """
+        with self._lock:
+            if not self._paired:
+                return False
+            return (time.time() - self._last_seen_at) <= _HEARTBEAT_TIMEOUT_SECONDS
+
     def create_pairing(self) -> PairingCode:
         """生成一次性配对令牌与二维码 URL。
 
@@ -183,6 +204,7 @@ class QrPairingTransport(SyncTransport):
         with self._lock:
             self._paired = False
             self._peer_info = None
+            self._last_seen_at = 0.0
             self._token = token
             self._token_expires_at = expires_at
         url = f"http://{_get_lan_ip()}:{self.port}/pair?token={token}"
@@ -251,15 +273,17 @@ class QrPairingTransport(SyncTransport):
                     self._send_json(404, {"error": "not found"})
 
             def do_POST(self) -> None:  # noqa: N802 - HTTP 命名规范
-                """处理 /pair 握手：解析 query 中的 token 与请求体中的对端信息。"""
+                """分发 POST 请求：/pair 握手、/heartbeat 心跳。"""
                 parsed = urlparse(self.path)
-                if parsed.path != "/pair":
+                if parsed.path == "/pair":
+                    query = parse_qs(parsed.query)
+                    token = (query.get("token") or [""])[0]
+                    peer_info = self._read_peer_info()
+                    self._handle_pair(token, peer_info)
+                elif parsed.path == "/heartbeat":
+                    self._handle_heartbeat()
+                else:
                     self._send_json(404, {"error": "not found"})
-                    return
-                query = parse_qs(parsed.query)
-                token = (query.get("token") or [""])[0]
-                peer_info = self._read_peer_info()
-                self._handle_pair(token, peer_info)
 
             def _read_peer_info(self) -> DeviceInfo:
                 """解析请求体中的对端设备信息，缺失/非法字段回退默认值。"""
@@ -290,11 +314,33 @@ class QrPairingTransport(SyncTransport):
                         transport._paired = True
                         transport._token = None
                         transport._peer_info = peer_info
+                        transport._last_seen_at = time.time()
                 if not valid:
                     self._send_json(401, {"error": "invalid or expired token"})
                     return
                 logger.info("二维码配对握手成功，对端: %s %s", peer_info.endpoint_type, peer_info.name)
                 self._send_json(200, transport.get_device_info().to_dict())
+
+            def _handle_heartbeat(self) -> None:
+                """处理手机端心跳：校验 peer_id 后刷新最近心跳时间。"""
+                try:
+                    length = int(self.headers.get("Content-Length", 0) or 0)
+                    raw = self.rfile.read(length) if length > 0 else b""
+                    data: dict[str, Any] = json.loads(raw.decode("utf-8")) if raw else {}
+                    peer_id = str(data.get("peer_id", ""))
+                except (ValueError, TypeError, UnicodeDecodeError):
+                    self._send_json(400, {"error": "invalid request body"})
+                    return
+
+                with transport._lock:
+                    if not transport._paired or transport._peer_info is None:
+                        self._send_json(401, {"error": "not paired"})
+                        return
+                    if peer_id != transport._peer_info.peer_id:
+                        self._send_json(403, {"error": "peer id mismatch"})
+                        return
+                    transport._last_seen_at = time.time()
+                self._send_json(200, {"ok": True})
 
             def log_message(self, format: str, *args: Any) -> None:
                 """静默默认访问日志，统一走项目 logger。"""

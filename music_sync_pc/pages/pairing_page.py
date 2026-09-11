@@ -23,6 +23,10 @@ _STATUS_IDLE = "未连接"
 _STATUS_WAITING = "等待手机扫码..."
 _STATUS_PAIRED = "已连接"
 _STATUS_ERROR = "连接失败"
+_STATUS_LOST = "连接已断开"
+
+# 健康轮询间隔（毫秒）：配对成功后定时检查对端心跳是否超时
+_POLL_INTERVAL_MS = 3000
 
 
 class PairingCard(ctk.CTkFrame):
@@ -43,6 +47,7 @@ class PairingCard(ctk.CTkFrame):
         self.config = config
         self._transport: QrPairingTransport | None = None
         self._dialog: PairingQrDialog | None = None
+        self._health_after_id: str | None = None
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -112,7 +117,7 @@ class PairingCard(ctk.CTkFrame):
             self._stop_transport()
 
     def _on_paired(self) -> None:
-        """握手成功的回调：更新状态行展示对端设备信息。"""
+        """握手成功的回调：更新状态行展示对端设备信息并启动健康轮询。"""
         self._dialog = None
         peer = self._transport.get_peer_info() if self._transport is not None else None
         if peer is not None:
@@ -123,11 +128,13 @@ class PairingCard(ctk.CTkFrame):
             self._status_label.configure(text=_STATUS_PAIRED)
         self._connect_btn.configure(state="disabled")
         self._disconnect_btn.configure(state="normal")
+        self._start_health_poll()
         logger.info("配对成功，卡片已展示对端信息")
 
     def _on_dialog_cancelled(self) -> None:
         """用户手动关闭弹窗的回调：复位卡片状态并释放服务。"""
         self._dialog = None
+        self._stop_health_poll()
         self._stop_transport()
         self._status_label.configure(text=_STATUS_IDLE)
         self._connect_btn.configure(state="normal")
@@ -136,6 +143,7 @@ class PairingCard(ctk.CTkFrame):
     def _on_disconnect_clicked(self) -> None:
         """停止配对服务并复位卡片状态（若弹窗仍打开则一并关闭）。"""
         self._close_dialog()
+        self._stop_health_poll()
         self._stop_transport()
         self._status_label.configure(text=_STATUS_IDLE)
         self._connect_btn.configure(state="normal")
@@ -159,11 +167,45 @@ class PairingCard(ctk.CTkFrame):
             dialog.close()
 
     # ------------------------------------------------------------------
+    # 健康轮询：配对成功后定时检测对端心跳，超时自动复位连接状态
+    # ------------------------------------------------------------------
+    def _start_health_poll(self) -> None:
+        """启动（或重置）一次健康检查的延时调度。"""
+        self._stop_health_poll()
+        self._health_after_id = self.after(_POLL_INTERVAL_MS, self._poll_health)
+
+    def _stop_health_poll(self) -> None:
+        """取消尚未触发的健康检查调度。"""
+        if self._health_after_id is not None:
+            self.after_cancel(self._health_after_id)
+            self._health_after_id = None
+
+    def _poll_health(self) -> None:
+        """检查对端心跳：未连接/存活则继续轮询，超时则复位为断开状态。"""
+        self._health_after_id = None
+        transport = self._transport
+        if transport is None or not transport.is_paired:
+            return
+        if not transport.is_peer_alive():
+            logger.info("检测到对端心跳超时，自动判定连接已断开")
+            self._on_connection_lost()
+            return
+        self._start_health_poll()
+
+    def _on_connection_lost(self) -> None:
+        """对端掉线后的复位：停止服务、更新状态行并恢复按钮。"""
+        self._stop_transport()
+        self._status_label.configure(text=_STATUS_LOST)
+        self._connect_btn.configure(state="normal")
+        self._disconnect_btn.configure(state="disabled")
+
+    # ------------------------------------------------------------------
     # 公开接口
     # ------------------------------------------------------------------
     def on_close(self) -> None:
-        """卡片销毁前停止服务，释放端口与线程。"""
+        """卡片销毁前停止服务与健康轮询，释放端口与线程。"""
         self._close_dialog()
+        self._stop_health_poll()
         self._stop_transport()
 
 

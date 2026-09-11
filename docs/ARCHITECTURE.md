@@ -60,7 +60,7 @@ MusicSync 是一个本地音乐库同步工具，帮助用户在电脑和手机�
 | 哈希工具 | `services/hash_utils.py` | xxHash 计算、大文件分块策略 |
 | 差异比较 | `services/diff_service.py` | PC 端自检差异比较 |
 | 传输通道 | `services/sync_transport.py` | 中立传输通道抽象接口（`SyncTransport` + `DeviceInfo` + `PairingCode` + `NoopTransport`） |
-| 二维码配对 | `services/qr_pairing.py` | 局域网二维码配对（单会话 HTTP 服务 + 一次性 token + 二维码渲染） |
+| 二维码配对 | `services/qr_pairing.py` | 局域网二维码配对（单会话 HTTP 服务 + 一次性 token + 二维码渲染 + 心跳保活端点） |
 | 连接卡片/弹窗 | `pages/pairing_page.py` | 局域网连接卡片（`PairingCard`）与二维码弹窗（`PairingQrDialog`），内嵌于扫描页 |
 | 配置管理 | `core/config.py` | JSON 配置读写、降级容错、哈希计算/调试日志开关字段 |
 | 日志管理 | `core/logger.py` | 日志文件轮转、分级输出、内存环形缓冲（实时日志采集） |
@@ -79,9 +79,9 @@ MusicSync 是一个本地音乐库同步工具，帮助用户在电脑和手机�
 | 导入服务 | `lib/services/import_service.dart` | PC 签名文件导入 |
 | 配置服务 | `lib/services/config_service.dart` | Hive 配置读写 |
 | 传输接口 | `lib/services/sync_transport.dart` | 中立传输通道抽象接口（`SyncTransport`） |
-| 二维码配对 | `lib/services/qr_pairing_service.dart` | 解析二维码 URL 并完成 `/pair` 握手（POST 回传本机设备信息） |
+| 二维码配对 | `lib/services/qr_pairing_service.dart` | 解析二维码 URL 完成 `/pair` 握手，并持有会话发送 `/heartbeat` 心跳（POST 回传本机设备信息） |
 | 设备信息模型 | `lib/models/device_info.dart` | 双端握手交换的设备元信息 |
-| 连接状态服务 | `lib/services/connection_service.dart` | 单例全局连接状态（已连接对端信息 + 通知 UI 刷新） |
+| 连接状态服务 | `lib/services/connection_service.dart` | 单例全局连接状态（已连接对端信息 + 心跳定时保活 + 掉线自动断开 + 通知 UI 刷新） |
 | 扫码页 | `lib/screens/qr_scan_screen.dart` | 相机扫码 + 连接握手 + 写入全局连接状态 |
 | 调试日志服务 | `lib/services/debug_log_service.dart` | 本地日志文件存储（每次启动新建会话文件）、状态/操作/报错/信息分级、7 天清理、读取/清空/导出 |
 | 日志条目模型 | `lib/models/debug_log_entry.dart` | 日志级别与日志条目 |
@@ -168,3 +168,4 @@ abstract class SyncTransport {
 2. **手机端**：用户点击主页「扫码连接」→ 请求相机权限 → 扫描二维码解析 URL。
 3. **握手**：手机端以 POST 请求 `/pair?token=<rand>` 并在请求体回传本机 `DeviceInfo`，PC 端校验 token（无效/过期/已消费返回 401），成功后双方交换 `DeviceInfo`（端点类型/名称/版本/协议版本/对端 id）。
 4. **完成**：PC 端弹窗自动关闭、卡片展示对端设备信息（可「断开连接」复位）；手机端主页展示「已连接 PC + 设备信息 + 断开」状态卡片（由全局 `ConnectionService` 驱动）；后续签名拉取与文件同步将在交换后的会话上扩展。
+5. **保活**：握手成功后手机端每 3 秒发送一次 `POST /heartbeat`（携带 peer_id），PC 端校验身份并刷新最近心跳时间，PC 端卡片每 3 秒轮询对端存活；任一端连续 9 秒未收到对端信号即判定掉线并自动复位为「连接已断开 / 未连接」状态。
