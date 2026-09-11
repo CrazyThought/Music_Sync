@@ -3,6 +3,9 @@
 /// 二维码携带配对 URL（`http://<ip>:<port>/pair?token=<rand>`），本服务
 /// 通过 [connect] 以 POST 访问该 URL，请求体携带本机 [DeviceInfo]，完成
 /// 握手后返回对端（PC）的 [DeviceInfo]。
+///
+/// 握手响应还会携带 PC 端 gRPC 数据传输服务端口（`grpc_port`），本服务将其
+/// 与基地址、本机 peerId 一并持有，供数据面（[GrpcSyncClient]）建连与鉴权。
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -25,6 +28,18 @@ class QrPairingService implements SyncTransport {
 
   /// 本次会话本机的 peerId，随握手与心跳一并发送，供 PC 端校验身份。
   String? _selfPeerId;
+
+  /// 握手响应携带的 PC 端 gRPC 端口；0 表示数据面不可用。
+  int _grpcPort = 0;
+
+  /// 握手成功后保存的服务基地址（scheme/host/port）；未连接时为 null。
+  Uri? get baseUri => _baseUri;
+
+  /// 本次会话本机（手机）的 peerId，作为 gRPC 请求的鉴权标识。
+  String? get selfPeerId => _selfPeerId;
+
+  /// PC 端 gRPC 数据传输端口；0 表示本次会话不支持文件传输。
+  int get grpcPort => _grpcPort;
 
   @override
   Future<DeviceInfo> connect(Uri uri) async {
@@ -56,6 +71,8 @@ class QrPairingService implements SyncTransport {
       }
 
       final json = jsonDecode(body) as Map<String, dynamic>;
+      // gRPC 端口缺失或非法时回退 0，表示本次会话不支持数据传输
+      _grpcPort = (json['grpc_port'] as num?)?.toInt() ?? 0;
       return DeviceInfo.fromJson(json);
     } finally {
       client.close(force: true);
@@ -95,9 +112,10 @@ class QrPairingService implements SyncTransport {
 
   @override
   Future<void> disconnect() async {
-    // 清理会话状态：释放基地址与 peerId，终止后续心跳
+    // 清理会话状态：释放基地址、peerId 与 gRPC 端口，终止后续心跳与数据传输
     _baseUri = null;
     _selfPeerId = null;
+    _grpcPort = 0;
   }
 
   /// 构造本机设备信息，随握手请求回传给 PC 端展示。

@@ -129,14 +129,19 @@ class ScannerService {
         final audioMeta =
             await _readAudioMeta(entity.path, relativePath, ext);
 
+        // 先算出哈希再派生算法标识：哈希计算失败会返回空串，
+        // 此时算法必须归一为 none，避免产生「空哈希 + xxh3_64」的自相矛盾条目。
+        var contentHash = '';
+        if (computeHash) {
+          contentHash = await _computeHash(entity.path, stat.size);
+        }
+
         result.add(FileEntry(
           relativePath: relativePath,
           fileSize: stat.size,
           modifiedAt: stat.modified.millisecondsSinceEpoch,
-          contentHash: computeHash
-              ? await _computeHash(entity.path, stat.size)
-              : '',
-          contentHashAlgo: computeHash ? 'xxh3_64' : 'none',
+          contentHash: contentHash,
+          contentHashAlgo: contentHash.isNotEmpty ? 'xxh3_64' : 'none',
           audioMeta: audioMeta,
         ));
 

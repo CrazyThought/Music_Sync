@@ -3,3 +3,6 @@ mutagen==1.47.0
 xxhash==3.8.1
 qrcode==7.4.2
 pillow==12.3.0
+grpcio==1.82.1
+protobuf==7.35.1
+grpcio-tools==1.82.1

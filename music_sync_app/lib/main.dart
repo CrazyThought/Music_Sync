@@ -8,6 +8,7 @@ import 'app.dart';
 import 'services/config_service.dart';
 import 'services/debug_log_service.dart';
 import 'services/permission_service.dart';
+import 'services/sync_baseline_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,6 +16,8 @@ void main() async {
     await Hive.initFlutter();
     await ConfigService.instance.init();
     await DebugLogService.instance.init();
+    // 同步基线用于双向同步的三方比较（上次达成一致的快照）
+    await SyncBaselineService.instance.init();
 
     final storageGranted = await PermissionService.instance.requestStoragePermission();
     if (!storageGranted) {

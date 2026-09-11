@@ -235,6 +235,22 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text('设备名: ${peer.name}'),
                   Text('版本: ${peer.version}'),
                   const SizedBox(height: 12),
+                  SizedBox(
+                    width: 130,
+                    child: FilledButton.icon(
+                      // 数据通道未就绪时禁用，并给出原因提示
+                      onPressed: connectionService.isDataChannelReady
+                          ? () => Navigator.pushNamed(context, '/sync')
+                          : null,
+                      icon: const Icon(Icons.sync),
+                      label: Text(
+                        connectionService.isDataChannelReady
+                            ? '开始同步'
+                            : 'PC 端未开启文件传输',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   OutlinedButton(
                     onPressed: () {
                       connectionService.disconnect();

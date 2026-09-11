@@ -115,6 +115,8 @@ class QrPairingTransport(SyncTransport):
         self._peer_id: str = secrets.token_hex(8)
         self._peer_info: DeviceInfo | None = None
         self._last_seen_at: float = 0.0
+        # gRPC 数据传输服务端口：握手响应中回传给手机端，用于建立数据面通道
+        self._grpc_port: int = 0
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------
@@ -151,6 +153,7 @@ class QrPairingTransport(SyncTransport):
             self._token = None
             self._peer_info = None
             self._last_seen_at = 0.0
+            self._grpc_port = 0
         server = self._server
         if server is not None:
             server.shutdown()
@@ -177,6 +180,34 @@ class QrPairingTransport(SyncTransport):
         """
         with self._lock:
             return self._peer_info
+
+    def get_peer_id(self) -> str | None:
+        """返回当前已配对对端的 ``peer_id``（未配对时返回 None）。
+
+        供 gRPC 鉴权拦截器校验请求身份：只有该 id 对应的设备可发起数据面
+        请求，避免局域网内其它设备蹭取音乐文件。
+
+        Returns:
+            对端 peer_id 字符串；未配对时为 ``None``。
+        """
+        with self._lock:
+            if self._peer_info is None:
+                return None
+            return self._peer_info.peer_id
+
+    def set_grpc_port(self, port: int) -> None:
+        """登记 gRPC 数据传输服务端口，供握手响应回传给手机端。
+
+        Args:
+            port: gRPC 服务实际监听端口；0 表示数据面不可用。
+        """
+        with self._lock:
+            self._grpc_port = int(port)
+
+    def get_grpc_port(self) -> int:
+        """返回当前登记的 gRPC 服务端口（未启用时为 0）。"""
+        with self._lock:
+            return self._grpc_port
 
     def is_peer_alive(self) -> bool:
         """判断对端（手机）是否仍在正常维持心跳。
@@ -319,7 +350,10 @@ class QrPairingTransport(SyncTransport):
                     self._send_json(401, {"error": "invalid or expired token"})
                     return
                 logger.info("二维码配对握手成功，对端: %s %s", peer_info.endpoint_type, peer_info.name)
-                self._send_json(200, transport.get_device_info().to_dict())
+                # 握手响应在本端设备信息基础上附带 gRPC 端口，供手机端建立数据面通道
+                payload = transport.get_device_info().to_dict()
+                payload["grpc_port"] = transport.get_grpc_port()
+                self._send_json(200, payload)
 
             def _handle_heartbeat(self) -> None:
                 """处理手机端心跳：校验 peer_id 后刷新最近心跳时间。"""
