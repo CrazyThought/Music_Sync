@@ -81,9 +81,10 @@
 ### 2.2 局域网传输（预留功能激活）
 - [x] 2.2.1 重构 `SyncTransport` 传输通道接口为中立能力语义（`start`/`stop`/`get_device_info`/`create_pairing`），解耦发现与传输层。见 `.trae/specs/refactor-transport-and-qr-pairing`
 - [x] 2.2.2 实现局域网二维码配对连接（建连 + 握手 + 两端连接状态展示）：PC 端 `QrPairingTransport`（单会话 HTTP 服务 + 一次性 token + 二维码渲染，POST 握手回传对端信息），连接入口内嵌扫描页卡片（`PairingCard` + 二维码弹窗）；手机端 `QrPairingService` + 扫码页 + 全局 `ConnectionService` 驱动主页连接状态卡片。见 `.trae/specs/refactor-transport-and-qr-pairing` 与 `.trae/documents/pc-connection-card-and-tab-width-fix`
-- [ ] 2.2.3 实现手机端 `fetchRemoteSignature()` — 握手后从 PC 拉取特征文件
-- [ ] 2.2.4 实现文件断点续传下载
-- [ ] 2.2.5 实现连接密码验证 & 设备白名单
+- [x] 2.2.3 实现连接保活检测（心跳轮询）：手机端每 3 秒发送 `POST /heartbeat`（携带 peer_id），PC 端校验并轮询对端存活，任一端连续 9 秒无信号即自动断开并复位连接状态。见 `.trae/documents/lan-connection-liveness-heartbeat.md`
+- [ ] 2.2.4 实现手机端 `fetchRemoteSignature()` — 握手后从 PC 拉取特征文件
+- [ ] 2.2.5 实现文件断点续传下载
+- [ ] 2.2.6 实现连接密码验证 & 设备白名单
 
 ### 2.3 移动端增强
 - [x] 2.3.1 实现扫描进度条：先获取文件总数，按当前进度实时展示扫描进度，并在进度条上显示当前正在扫描的文件名

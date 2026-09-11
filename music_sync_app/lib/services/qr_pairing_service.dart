@@ -14,11 +14,23 @@ import 'sync_transport.dart';
 /// 握手请求超时时间（秒）。
 const int _connectTimeoutSeconds = 5;
 
+/// 心跳请求超时时间（秒）。
+const int _heartbeatTimeoutSeconds = 3;
+
 class QrPairingService implements SyncTransport {
   final Random _random = Random.secure();
 
+  /// 握手成功后保存的服务基地址（scheme/host/port），供后续心跳复用。
+  Uri? _baseUri;
+
+  /// 本次会话本机的 peerId，随握手与心跳一并发送，供 PC 端校验身份。
+  String? _selfPeerId;
+
   @override
   Future<DeviceInfo> connect(Uri uri) async {
+    // 记录服务基地址：后续心跳请求直接拼 /heartbeat 路径
+    _baseUri = Uri(scheme: uri.scheme, host: uri.host, port: uri.port);
+
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: _connectTimeoutSeconds);
 
@@ -26,9 +38,14 @@ class QrPairingService implements SyncTransport {
       final request = await client.postUrl(uri);
       request.headers.set(HttpHeaders.acceptHeader, 'application/json');
       request.headers.contentType = ContentType.json;
-      // 回传本机设备信息，供 PC 端解析并展示连接对象
+      // 回传本机设备信息，供 PC 端解析并展示连接对象。
+      // 显式设置 contentLength：dart:io 默认 contentLength=-1 会走 chunked 分块
+      // 编码，而 PC 端 BaseHTTPRequestHandler 不解析 chunked 请求体，会读不到
+      // body 并残留未读字节触发 RST；改为 Content-Length 让服务端正确读取。
       final localInfo = _buildLocalDeviceInfo();
-      request.add(utf8.encode(jsonEncode(localInfo.toJson())));
+      final bodyBytes = utf8.encode(jsonEncode(localInfo.toJson()));
+      request.contentLength = bodyBytes.length;
+      request.add(bodyBytes);
 
       final response = await request.close();
       final body = await response.transform(utf8.decoder).join();
@@ -45,15 +62,49 @@ class QrPairingService implements SyncTransport {
     }
   }
 
+  /// 向 PC 端发送一次心跳，校验失败或网络错误时抛出异常。
+  ///
+  /// 供 [ConnectionService] 定时调用以维持连接；未完成握手（无基地址或
+  /// 无 peerId）时抛出 [StateError]，网络异常或非 200 响应抛出其它异常。
+  Future<void> heartbeat() async {
+    final base = _baseUri;
+    final peerId = _selfPeerId;
+    if (base == null || peerId == null) {
+      throw StateError('尚未建立连接，无法发送心跳');
+    }
+
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: _heartbeatTimeoutSeconds);
+    try {
+      final request = await client.postUrl(base.resolve('/heartbeat'));
+      request.headers.contentType = ContentType.json;
+      // 显式声明 Content-Length，避免 chunked 请求体被 PC 端忽略（同 connect）
+      final bodyBytes = utf8.encode(jsonEncode({'peer_id': peerId}));
+      request.contentLength = bodyBytes.length;
+      request.add(bodyBytes);
+
+      final response = await request.close();
+      await response.drain<void>();
+      if (response.statusCode != HttpStatus.ok) {
+        throw const FormatException('心跳失败：服务端未接受');
+      }
+    } finally {
+      client.close(force: true);
+    }
+  }
+
   @override
   Future<void> disconnect() async {
-    // 当前为无状态握手，无需额外释放；后续若维护持久会话则在此关闭连接
+    // 清理会话状态：释放基地址与 peerId，终止后续心跳
+    _baseUri = null;
+    _selfPeerId = null;
   }
 
   /// 构造本机设备信息，随握手请求回传给 PC 端展示。
   ///
   /// 设备名取系统主机名（异常或为空时回退 `AndroidDevice`）；peerId 为
-  /// 会话级随机值，当前阶段仅用于身份展示，跨会话不要求稳定。
+  /// 会话级随机值，生成后持久化到 [_selfPeerId]，后续心跳复用同一标识供
+  /// PC 端校验身份。
   DeviceInfo _buildLocalDeviceInfo() {
     var name = '';
     try {
@@ -63,12 +114,13 @@ class QrPairingService implements SyncTransport {
     }
     if (name.isEmpty) name = 'AndroidDevice';
 
+    _selfPeerId = _generatePeerId();
     return DeviceInfo(
       endpointType: 'phone',
       name: name,
       version: appVersion,
       protocolVersion: transportProtocolVersion,
-      peerId: _generatePeerId(),
+      peerId: _selfPeerId!,
     );
   }
 
