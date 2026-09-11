@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 APP_NAME = "MusicSync"
-APP_VERSION = "1.1.1"
+APP_VERSION = "2.0.0"
 SIGNATURE_FORMAT_VERSION = "2.0"
 
 AUDIO_EXTENSIONS: frozenset[str] = frozenset({

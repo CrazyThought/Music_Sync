@@ -1,7 +1,7 @@
-﻿name: music_sync_app
+name: music_sync_app
 description: MusicSync 手机端 - 本地音乐特征扫描与差异比较
 publish_to: "none"
-version: 1.1.1+2
+version: 2.0.0+3
 
 environment:
   sdk: ">=3.3.0 <4.0.0"

@@ -341,7 +341,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            const Text('版本: 1.1.1'),
+            const Text('版本: 2.0.0'),
             const SizedBox(height: 4),
             const Text('签名格式: 2.0 | 哈希: xxh64'),
             const SizedBox(height: 4),

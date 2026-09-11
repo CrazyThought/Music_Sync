@@ -115,7 +115,7 @@ MusicSync 是一个本地音乐库同步工具，帮助用户在电脑和手机�
 | 脚本 | 路径 | 用途 |
 |------|------|------|
 | proto 代码生成 | `scripts/generate_proto.ps1` | 依据 `proto/musicsync.proto` 生成两端 gRPC 代码（Python 侧写入 `music_sync_pc/generated/`，Dart 侧写入 `music_sync_app/lib/generated/`），并自动修正 Python 生成代码的包内相对导入。前置依赖：`grpcio-tools`（Python）与 `protoc_plugin`（`dart pub global activate protoc_plugin`）。**修改 proto 后必须重新执行本脚本。** |
-| 一键发布脚本 | `scripts/build_release.ps1` | 读取 App 与 PC 当前版本 → 交互输入新版本名(x.y.z，App 构建号自动+1，PC 保持 x.y.z) → 前置校验 flutter 与 PyInstaller → 同步更新两端版本文件（App：`pubspec.yaml`、`settings_screen.dart`；PC：`constants.py`、`settings_page.py`）→ 依次执行 `flutter build apk --release` 与 `pyinstaller build.spec` → 统一归档 `MusicSync-Vxx.xx.xx.apk/.exe` 到项目根 `dist/`。版本来源：App 为 `pubspec.yaml` 的 `version` 字段（含构建号），PC 为 `constants.py` 的 `APP_VERSION`（仅 x.y.z）。 |
+| 一键发布脚本 | `scripts/build_release.ps1` | 读取 App 与 PC 当前版本 → 交互选择构建范围（1 全量构建 / 2 仅 App / 3 仅 PC）→ 仅全量构建时输入新版本名(x.y.z，App 构建号自动+1，PC 保持 x.y.z) → 按范围校验工具链（flutter / PyInstaller）→ 仅全量构建时同步更新两端版本文件（App：`pubspec.yaml`、`settings_screen.dart`；PC：`constants.py`、`settings_page.py`）→ 按范围执行 `flutter build apk --release` 与 PyInstaller 构建（探测与实际调用复用同一套方式：优先 `pyinstaller`，回退 `python -m PyInstaller`）→ 归档 `MusicSync-Vxx.xx.xx.apk/.exe` 到项目根 `dist/`（部分构建沿用当前版本号，同名产物会被覆盖）。版本来源：App 为 `pubspec.yaml` 的 `version` 字段（含构建号），PC 为 `constants.py` 的 `APP_VERSION`（仅 x.y.z）。 |
 
 ## 4. 数据流
 
