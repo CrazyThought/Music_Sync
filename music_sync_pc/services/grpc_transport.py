@@ -528,8 +528,12 @@ class GrpcSyncServer:
         self._executor = ThreadPoolExecutor(
             max_workers=GRPC_MAX_WORKERS, thread_name_prefix="grpc-sync"
         )
-        # 单块 256KB，预留一倍余量给消息头，避免大分块触发默认 4MB 上限
-        max_message_bytes = GRPC_TRANSFER_CHUNK_SIZE * 2
+        # 接收上限按文件分块设计：单块 256KB，预留一倍余量给消息头
+        max_receive_message_bytes = GRPC_TRANSFER_CHUNK_SIZE * 2
+        # 发送上限需容纳 GetSignature 整包下发的签名 JSON（随曲库规模增长，
+        # 实测约 730KB 已超 512KB 上限），放宽到 8MB；文件下载仍按 256KB 分块，
+        # 远低于该上限，不受影响
+        max_send_message_bytes = 8 * 1024 * 1024
         try:
             for offset in range(100):
                 candidate = port + offset
@@ -537,8 +541,8 @@ class GrpcSyncServer:
                     self._executor,
                     interceptors=(_PeerAuthInterceptor(self._peer_id_provider),),
                     options=(
-                        ("grpc.max_send_message_length", max_message_bytes),
-                        ("grpc.max_receive_message_length", max_message_bytes),
+                        ("grpc.max_send_message_length", max_send_message_bytes),
+                        ("grpc.max_receive_message_length", max_receive_message_bytes),
                     ),
                 )
                 musicsync_pb2_grpc.add_MusicSyncServicer_to_server(

@@ -9,6 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from core.config import ConfigManager
 from core.logger import setup_logger, get_logger
+from utils.constants import APP_VERSION
 
 _SINGLE_INSTANCE_LOCK: Path = Path.home() / ".musicsync" / ".lock"
 
@@ -40,7 +41,7 @@ def _release_lock() -> None:
 def main() -> None:
     setup_logger()
     logger = get_logger()
-    logger.info("MusicSync PC 端 v1.0.0 启动")
+    logger.info("MusicSync PC 端 v%s 启动", APP_VERSION)
 
     if not _acquire_lock():
         logger.warning("检测到已有实例正在运行，本次启动取消")

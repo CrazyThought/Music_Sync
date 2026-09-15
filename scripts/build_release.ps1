@@ -6,7 +6,8 @@
 #       按范围执行 flutter build apk --release / PyInstaller 构建 →
 #       重命名归档到项目根 dist/（部分构建沿用当前版本号，会覆盖同名产物）
 # 用法: .\scripts\build_release.ps1
-# 前置: flutter 可用；Python + PyInstaller 已就绪（PC 打包含 PyInstaller）
+# 前置: flutter 可用；PC 构建优先使用 C:\Python313\python.exe（该环境依赖齐全，
+#   MSYS2 的 python 缺 PyInstaller，不能用于构建）
 #       已配置 android/key.properties(signingConfigs.release)
 # 产物: dist\MusicSync-Vx.y.z.apk 与 dist\MusicSync-Vx.y.z.exe
 # ============================================================
@@ -117,20 +118,40 @@ if ($buildApp -and -not (Get-Command flutter -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-# PyInstaller 探测：优先 pyinstaller 命令，回退 python -m PyInstaller。
+# PyInstaller 探测：优先项目专用的 Python 3.13（C:\Python313\python.exe），
+# 回退 pyinstaller 命令，最后回退 PATH 中的 python（-m PyInstaller）。
 # 注意：探测结果会被下面的构建步骤复用（$pyInstallerExe/$pyInstallerArgs），
 #       避免出现“探测走回退分支、构建却调用裸 pyinstaller 导致命令找不到”的不一致。
 $pyInstallerExe = $null
 $pyInstallerArgs = @()
 if ($buildPc) {
-    if (Get-Command pyinstaller -ErrorAction SilentlyContinue) {
-        $pyInstallerExe = "pyinstaller"
-    } elseif (Get-Command python -ErrorAction SilentlyContinue) {
-        & python -m PyInstaller --version 2>$null | Out-Null
-        if ($LASTEXITCODE -eq 0) {
-            $pyInstallerExe = "python"
-            $pyInstallerArgs = @("-m", "PyInstaller")
+    # 探测期间临时放开 EAP：原生程序 stderr 在 Stop 模式下会被提升为终止性错误
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $python313 = "C:\Python313\python.exe"
+        if (Test-Path -LiteralPath $python313) {
+            & $python313 -m PyInstaller --version 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                $pyInstallerExe = $python313
+                $pyInstallerArgs = @("-m", "PyInstaller")
+            }
         }
+        if ($null -eq $pyInstallerExe -and (Get-Command pyinstaller -ErrorAction SilentlyContinue)) {
+            pyinstaller --version 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                $pyInstallerExe = "pyinstaller"
+            }
+        }
+        if ($null -eq $pyInstallerExe -and (Get-Command python -ErrorAction SilentlyContinue)) {
+            python -m PyInstaller --version 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                $pyInstallerExe = "python"
+                $pyInstallerArgs = @("-m", "PyInstaller")
+            }
+        }
+    } finally {
+        $ErrorActionPreference = $prevEap
     }
     if ($null -eq $pyInstallerExe) {
         Write-Host "错误：未找到 PyInstaller，请先安装（pip install pyinstaller 或在相应环境中配置）。" -ForegroundColor Red
